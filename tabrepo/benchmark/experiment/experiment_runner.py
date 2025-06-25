@@ -31,6 +31,7 @@ class ExperimentRunner:
         input_format: Literal["openml", "csv"] = "openml",
         cacher: AbstractCacheFunction | None = None,
         debug_mode: bool = True,
+        use_ftd: bool = False, # TODO: Make this parameter be part of 'dat_args'
     ):
         """
 
@@ -65,6 +66,7 @@ class ExperimentRunner:
         self.fit_args = fit_args
         self.cleanup = cleanup
         self.input_format = input_format
+        self.use_ftd = use_ftd
         ag_eval_metric_map = {
             'binary': 'roc_auc',
             'multiclass': 'log_loss',
@@ -74,7 +76,7 @@ class ExperimentRunner:
         self.eval_metric: Scorer = get_metric(metric=self.eval_metric_name, problem_type=self.task.problem_type)
         self.model = None
         self.task_split_idx = self.task.get_split_idx(fold=self.fold, repeat=self.repeat, sample=self.sample)
-        self.X, self.y, self.X_test, self.y_test = self.task.get_train_test_split(fold=self.fold, repeat=self.repeat, sample=self.sample)
+        self.X, self.y, self.X_test, self.y_test = self.task.get_train_test_split(fold=self.fold, repeat=self.repeat, sample=self.sample, use_ftd=self.use_ftd)
         if input_format == "csv":
             self.X = self.task.to_csv_format(X=self.X)
             self.X_test = self.task.to_csv_format(X=self.X_test)
@@ -129,8 +131,11 @@ class ExperimentRunner:
             debug_mode=debug_mode,
             **kwargs,
         )
+        # if task.ft_transformed:
         return obj.run()
-
+        # else:
+        #     return {}
+    
     def _run(self):
         utc_time = datetime.datetime.now(datetime.timezone.utc)
         time_start_str = utc_time.strftime('%Y-%m-%d %H:%M:%S')

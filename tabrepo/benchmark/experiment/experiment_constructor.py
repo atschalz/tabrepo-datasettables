@@ -118,6 +118,7 @@ class Experiment:
         repeat: int = 0,
         sample: int = 0,
         cacher: AbstractCacheFunction | None = None,
+        use_ftd: bool = False,
         ignore_cache: bool = False,
         **experiment_kwargs,
     ) -> object:
@@ -134,6 +135,7 @@ class Experiment:
                     sample=sample,
                     task_name=task_name,
                     method=self.name,
+                    use_ftd=use_ftd,
                     fit_args=self.method_kwargs,
                     **self.experiment_kwargs,
                     **experiment_kwargs,

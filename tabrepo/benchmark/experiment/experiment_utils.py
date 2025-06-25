@@ -122,6 +122,7 @@ class ExperimentBatchRunner:
         repeats: list[int] | None = None,
         ignore_cache: bool = False,
         raise_on_failure: bool = True,
+        use_ftd: bool = False,
     ) -> list[dict[str, Any]]:
         """
 
@@ -155,6 +156,7 @@ class ExperimentBatchRunner:
             methods=methods,
             task_metadata=self.task_metadata,
             ignore_cache=ignore_cache,
+            use_ftd=use_ftd,
             cache_cls=self.cache_cls,
             cache_cls_kwargs=self.cache_cls_kwargs,
             cache_path_format=self.cache_path_format,
@@ -356,6 +358,7 @@ def run_experiments(
     debug_mode: bool = True,
     s3_dataset_cache: str | None = None,
     repeat_fold_pairs: list[tuple[int | None, int]] | None = None,
+    use_ftd: bool = False,
 ) -> list[dict]:
     """
 
@@ -524,6 +527,7 @@ def run_experiments(
                             task=task,
                             fold=fold,
                             task_name=task_name,
+                            use_ftd=use_ftd,
                             cacher=cacher,
                             ignore_cache=ignore_cache,
                             debug_mode=debug_mode,

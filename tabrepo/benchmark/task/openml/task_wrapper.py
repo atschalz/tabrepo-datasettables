@@ -25,6 +25,7 @@ class OpenMLTaskWrapper:
         self.X, self.y = get_task_data(task=self.task)
         self.problem_type = get_ag_problem_type(self.task)
         self.label = self.task.target_name
+        self.ft_transformed = False
 
     @classmethod
     def from_task_id(cls, task_id: int) -> Self:
@@ -103,6 +104,7 @@ class OpenMLTaskWrapper:
         test_indices: np.ndarray = None,
         train_size: int | float = None,
         test_size: int | float = None,
+        use_ftd: bool = False,
         random_state: int = 0,
     ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
         if train_indices is None or test_indices is None:
@@ -117,6 +119,23 @@ class OpenMLTaskWrapper:
         if test_size is not None:
             X_test, y_test = self.subsample(X=X_test, y=y_test, size=test_size, random_state=random_state)
 
+
+        if use_ftd:
+            X_cp = X_train.copy()
+            from ft_detection import FeatureTypeDetector # TODO: Move ft_detection to be part of TabArena/AutoGluon
+            ftd = FeatureTypeDetector(target_type=self.problem_type)
+            ftd.fit(X_train, y_train)
+            X_train = ftd.transform(X=X_train)
+            X_test = ftd.transform(X=X_test)
+
+            self.new_categorical = list(ftd.cat_dtype_maps.keys())
+            self.new_numeric = [col for col in X_train.columns if ftd.dtypes[col]=="numeric" and ftd.orig_dtypes[col]!="numeric"]
+            print(f"New categorical: {self.new_categorical}")
+            print(f'New numeric: {self.new_numeric}')
+
+            if any(X_cp.dtypes != X_train.dtypes):
+                self.ft_transformed = True
+        
         return X_train, y_train, X_test, y_test
 
     @classmethod
