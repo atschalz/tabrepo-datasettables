@@ -76,10 +76,10 @@ class ExperimentRunner:
         self.eval_metric: Scorer = get_metric(metric=self.eval_metric_name, problem_type=self.task.problem_type)
         self.model = None
         self.task_split_idx = self.task.get_split_idx(fold=self.fold, repeat=self.repeat, sample=self.sample)
-        self.X, self.y, self.X_test, self.y_test = self.task.get_train_test_split(fold=self.fold, repeat=self.repeat, sample=self.sample, use_ftd=self.use_ftd)
-        if input_format == "csv":
-            self.X = self.task.to_csv_format(X=self.X)
-            self.X_test = self.task.to_csv_format(X=self.X_test)
+        self.X, self.y, self.X_test, self.y_test = self.task.get_train_test_split(fold=self.fold, repeat=self.repeat, sample=self.sample, use_ftd=self.use_ftd, input_format=input_format)
+        # if input_format == "csv":
+        #     self.X = self.task.to_csv_format(X=self.X)
+        #     self.X_test = self.task.to_csv_format(X=self.X_test)
         self.label_cleaner = LabelCleaner.construct(problem_type=self.task.problem_type, y=self.y)
         if cacher is None:
             cacher = CacheFunctionDummy()
