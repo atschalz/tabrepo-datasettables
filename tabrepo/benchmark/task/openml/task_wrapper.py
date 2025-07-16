@@ -106,14 +106,40 @@ class OpenMLTaskWrapper:
         test_size: int | float = None,
         use_ftd: bool = False,
         input_format: str = "openml",  # 'openml' or 'csv'
+        benchmark_name: str | None = None,  # Used for Grinsztajn benchmark
         random_state: int = 0,
     ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
         if train_indices is None or test_indices is None:
             train_indices, test_indices = self.get_split_indices(fold=fold, repeat=repeat, sample=sample)
+
+
         X_train = self.X.loc[train_indices]
         y_train = self.y[train_indices]
         X_test = self.X.loc[test_indices]
         y_test = self.y[test_indices]
+
+        # Exceptions for the Grinsztajn benchmark
+        # TODO: Move to init
+        if self.task.task_id==261094: # visualizing_soil
+            X_train[y_train.name] = y_train.copy()
+            y_train = X_train["resistivity"]
+            X_train = X_train.drop("resistivity",axis=1)
+            X_test[y_test.name] = y_test.copy()
+            y_test = X_test["resistivity"]
+            X_test = X_test.drop("resistivity",axis=1)
+        elif self.task.task_id==361085: # sulfur
+            X_train = X_train.drop(["y2"], axis=1)         
+            X_test = X_test.drop(["y2"], axis=1)
+        elif self.task.task_id==361104: # SGEMM_GPU_kernel_performance
+            X_train = X_train.drop(["Run2","Run3","Run4"],axis=1)   
+            X_test = X_test.drop(["Run2","Run3","Run4"],axis=1)
+        elif self.task.task_id==361098: # Brazilian_houses
+            X_train = X_train.drop(['rent_amount_(BRL)', 'property_tax_(BRL)', 'fire_insurance_(BRL)'],axis=1)
+            X_test = X_test.drop(['rent_amount_(BRL)', 'property_tax_(BRL)', 'fire_insurance_(BRL)'],axis=1)
+        elif self.task.task_id==361103: # particulate-matter-ukair-2017
+            X_train = X_train.drop('PM.sub.2.5..sub..particulate.matter..Hourly.measured.',axis=1)
+            X_test = X_test.drop('PM.sub.2.5..sub..particulate.matter..Hourly.measured.',axis=1)
+        # Might also add eye_movements and nyc-taxi
 
         if train_size is not None:
             X_train, y_train = self.subsample(X=X_train, y=y_train, size=train_size, random_state=random_state)
@@ -127,15 +153,46 @@ class OpenMLTaskWrapper:
         if use_ftd:
             X_cp = X_train.copy()
             from ft_detection import FeatureTypeDetector # TODO: Move ft_detection to be part of TabArena/AutoGluon
-            ftd = FeatureTypeDetector(target_type=self.problem_type)
-            ftd.fit(X_train, y_train)
-            X_train = ftd.transform(X=X_train, mode='add')
-            X_test = ftd.transform(X=X_test, mode='add')
+            # ftd = FeatureTypeDetector(target_type=self.problem_type, lgb_model_type='full-capacity')
+            
+            default_params = {
+                'tests_to_run': ['dummy_mean','leave_one_out','combination', 'interpolation'],
+                'min_q_as_num': 6, 
+                'n_folds': 5,
+                'alpha': 0.05,
+                'significance_method': 'wilcoxon',
+                'max_degree': 5,
+                'interpolation_criterion': "match",
+                'combination_criterion': 'win',
+                'combination_test_min_bins': 2,
+                'combination_test_max_bins': 2048,
+                'binning_strategy': 'lgb', # ['lgb', 'KMeans', 'DT']
+                }
 
-            self.new_categorical = list(ftd.cat_dtype_maps.keys())
-            self.new_numeric = [col for col in X_train.columns if ftd.dtypes[col]=="numeric" and ftd.orig_dtypes[col]!="numeric"]
-            print(f"New categorical: {self.new_categorical}")
-            print(f'New numeric: {self.new_numeric}')
+            X_train = X_train.drop(["Delivery_person_ID", "Type_of_order"], axis=1, errors='ignore')
+            X_test = X_test.drop(["Delivery_person_ID", "Type_of_order"], axis=1, errors='ignore')
+
+            # mvp_params = default_params.copy()
+            # mvp_params.update({
+            #     'tests_to_run': ['dummy_mean','leave_one_out','combination', 'interpolation', 'multivariate_performance'],
+            #     'mvp_criterion': 'average',
+            #     'mvp_use_data': 'all',  # 'all' or 'numeric'
+            #     'alpha': 0.1,
+            #     })
+            
+            # ftd = FeatureTypeDetector(target_type=self.problem_type, 
+            #                         **mvp_params,
+                                    
+            #                         )
+
+            # ftd.fit(X_cp, y_train)
+            # X_train = ftd.transform(X=X_train, mode='add')
+            # X_test = ftd.transform(X=X_test, mode='add')
+
+            # self.new_categorical = list(ftd.cat_dtype_maps.keys())
+            # self.new_numeric = [col for col in X_train.columns if ftd.dtypes[col]=="numeric" and ftd.orig_dtypes[col]!="numeric"]
+            # print(f"New categorical: {self.new_categorical}")
+            # print(f'New numeric: {self.new_numeric}')
 
             # if any(X_cp.dtypes != X_train.dtypes):
             #     self.ft_transformed = True

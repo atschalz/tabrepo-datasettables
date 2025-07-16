@@ -32,6 +32,7 @@ class ExperimentRunner:
         cacher: AbstractCacheFunction | None = None,
         debug_mode: bool = True,
         use_ftd: bool = False, # TODO: Make this parameter be part of 'dat_args'
+        benchmark_name: str | None = None,  
     ):
         """
 
@@ -76,7 +77,10 @@ class ExperimentRunner:
         self.eval_metric: Scorer = get_metric(metric=self.eval_metric_name, problem_type=self.task.problem_type)
         self.model = None
         self.task_split_idx = self.task.get_split_idx(fold=self.fold, repeat=self.repeat, sample=self.sample)
-        self.X, self.y, self.X_test, self.y_test = self.task.get_train_test_split(fold=self.fold, repeat=self.repeat, sample=self.sample, use_ftd=self.use_ftd, input_format=input_format)
+        if benchmark_name == 'Grinsztajn':
+            self.X, self.y, self.X_test, self.y_test = self.task.get_train_test_split(fold=self.fold, repeat=self.repeat, sample=self.sample, use_ftd=self.use_ftd, input_format=input_format, train_size=10000, test_size=50000, benchmark_name=benchmark_name)
+        else:
+            self.X, self.y, self.X_test, self.y_test = self.task.get_train_test_split(fold=self.fold, repeat=self.repeat, sample=self.sample, use_ftd=self.use_ftd, input_format=input_format, benchmark_name=benchmark_name)
         # if input_format == "csv":
         #     self.X = self.task.to_csv_format(X=self.X)
         #     self.X_test = self.task.to_csv_format(X=self.X_test)
