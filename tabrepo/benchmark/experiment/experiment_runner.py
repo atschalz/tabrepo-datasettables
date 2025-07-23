@@ -78,9 +78,9 @@ class ExperimentRunner:
         self.model = None
         self.task_split_idx = self.task.get_split_idx(fold=self.fold, repeat=self.repeat, sample=self.sample)
         if benchmark_name == 'Grinsztajn':
-            self.X, self.y, self.X_test, self.y_test = self.task.get_train_test_split(fold=self.fold, repeat=self.repeat, sample=self.sample, use_ftd=self.use_ftd, input_format=input_format, train_size=10000, test_size=50000, benchmark_name=benchmark_name)
+            self.X, self.y, self.X_test, self.y_test = self.task.get_train_test_split(fold=self.fold, repeat=self.repeat, sample=self.sample, train_size=10000, test_size=50000, benchmark_name=benchmark_name)
         else:
-            self.X, self.y, self.X_test, self.y_test = self.task.get_train_test_split(fold=self.fold, repeat=self.repeat, sample=self.sample, use_ftd=self.use_ftd, input_format=input_format, benchmark_name=benchmark_name)
+            self.X, self.y, self.X_test, self.y_test = self.task.get_train_test_split(fold=self.fold, repeat=self.repeat, sample=self.sample, benchmark_name=benchmark_name)
         # if input_format == "csv":
         #     self.X = self.task.to_csv_format(X=self.X)
         #     self.X_test = self.task.to_csv_format(X=self.X_test)
@@ -290,7 +290,8 @@ class OOFExperimentRunner(ExperimentRunner):
             out["metric_error_val"] = self.model.get_metric_error_val()
 
             if self.compute_bag_info and (self.model.can_get_per_child_oof and self.model.can_get_per_child_val_idx):
-                simulation_artifact["bag_info"] = self.model.bag_artifact(X_test=self.X_test)
+                X_test_transform = self.model.transform_X(X=self.X_test)
+                simulation_artifact["bag_info"] = self.model.bag_artifact(X_test=X_test_transform)
 
 
             simulation_artifact["pred_proba_dict_val"] = {self.method: simulation_artifact["pred_proba_dict_val"]}
