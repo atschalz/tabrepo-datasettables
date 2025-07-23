@@ -5,6 +5,8 @@ if [ "$#" -ne 5 ]; then
     exit 1
 fi
 
+# bash tabrepo/tabflow/docker/build_docker.sh andrej-test test-csv 763104351884 097403188315 us-west-2
+
 REPO_NAME=$1
 TAG=$2
 SOURCE_ACCOUNT=$3
@@ -18,7 +20,9 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BASE_DIR="$( cd "${SCRIPT_DIR}/../../.." && pwd )"
 
 # Check if all required directories exist, this is specific for TabRepo
-REQUIRED_DIRS=("autogluon" "tabrepo")
+REQUIRED_DIRS=("tabrepo")
+# TODO: Clarify whether autogluon really is necessary as we install it in the image anyway
+# REQUIRED_DIRS=("autogluon" "tabrepo")
 
 for dir in "${REQUIRED_DIRS[@]}"; do
     if [ ! -d "${BASE_DIR}/${dir}" ]; then
