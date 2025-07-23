@@ -46,6 +46,22 @@ def get_random_searcher(search_space):
     searcher.get_config()  # Clean out default
     return searcher
 
+def get_tabarena_model_configs(model_name: str, n_trials: int) -> dict:
+    from tabrepo.nips2025_utils.tabarena_context import TabArenaContext
+    tabarena_context = TabArenaContext()
+    if model_name in ['TabPFNv2', 'TabICL', 'TabDPT']: # TODO: Check whether 
+        model_name += '_GPU'
+    mod_configs = tabarena_context.load_configs_hyperparameters([model_name], download='auto')  # load hyperparameters for the methods
+
+    use_configs = [{key: value for key, value in mod_configs[f'{model_name}_c1_BAG_L1']['hyperparameters'].items() if key != "ag_args_ensemble"}]
+    # use_configs = []
+    if n_trials > 0:
+        for num in range(1, n_trials+2):
+            if num >= n_trials:
+                break
+            use_configs.append({key: value for key, value in mod_configs[f'{model_name}_r{num}_BAG_L1']['hyperparameters'].items() if key != "ag_args_ensemble"})
+
+    return use_configs
 
 class AbstractConfigGenerator:
     def __init__(
@@ -86,9 +102,16 @@ class AGConfigGenerator(AbstractConfigGenerator):
         configs = combine_manual_and_random_configs(manual_configs=self.manual_configs, random_configs=random_configs, name_id_suffix=name_id_suffix)
         return configs
 
-    def generate_all_bag_experiments(self, num_random_configs: int, name_id_suffix: str = "") -> list:
-        configs = self.generate_all_configs_lst(num_random_configs=num_random_configs, name_id_suffix=name_id_suffix)
-        experiments = generate_bag_experiments(model_cls=self.model_cls, configs=configs, name_suffix_from_ag_args=True)
+    def generate_all_bag_experiments(self, num_random_configs: int, name_id_suffix: str = "", 
+                                     reuse_tabarena: bool = False,
+                                     preprocessor_name: str = 'default') -> list:
+        if reuse_tabarena:
+            configs = get_tabarena_model_configs(model_name=self.model_cls.ag_name, n_trials=num_random_configs)
+        else:
+            configs = self.generate_all_configs_lst(num_random_configs=num_random_configs, name_id_suffix=name_id_suffix)
+    
+
+        experiments = generate_bag_experiments(model_cls=self.model_cls, configs=configs, name_suffix_from_ag_args=True, preprocessor_name=preprocessor_name)
         return experiments
 
 
@@ -155,6 +178,7 @@ def generate_bag_experiments(
     name_id_suffix: str = "",
     name_bag_suffix: str = "_BAG_L1",
     add_name_suffix_to_params: bool = True,
+    preprocessor_name: str = 'default',
     **kwargs
 ) -> list[AGModelBagExperiment]:
     experiments = []
@@ -176,6 +200,14 @@ def generate_bag_experiments(
             num_bag_folds=num_bag_folds,
             num_bag_sets=num_bag_sets,
             time_limit=time_limit,
+            method_kwargs = {
+                    'preprocess_data': True,
+                    'preprocessor_name': preprocessor_name,
+                    'fit_kwargs': {
+                        'feature_generator': None
+                    }
+                },
+
             **kwargs,
         )
         experiments.append(experiment)
