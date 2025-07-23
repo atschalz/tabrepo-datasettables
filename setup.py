@@ -3,17 +3,15 @@ from __future__ import annotations
 from setuptools import find_packages, setup
 
 requirements = [
-    "autogluon.core[all]>=1.3",
+    "autogluon>=1.3",  # TODO: Remove after moving `benchmark` code elsewhere
     "openml>=0.14.1",  # consider making optional
+    "pyyaml",
     "pytest",
     "typing-extensions>=4.11,<5",  # used for `Self` type hint
     "huggingface-hub",
 ]
 
 extras_require = {
-    "autogluon": [
-        "autogluon>=1.3",
-    ],
     "tabpfn": [
         "tabpfn>=2.0.9",  # We used version 2.0.9
         "kditransform",
@@ -32,7 +30,9 @@ extras_require = {
     ],
     "tabdpt": [
         # TODO: pypi package is not available yet
-        "tabdpt @ git+https://github.com/layer6ai-labs/TabDPT.git",
+        # FIXME: newest version (1.1) has (unnecessary) strict version requirements
+        #  that are not compatible with autogluon, so we stick to the old hash
+        "tabdpt @ git+https://github.com/layer6ai-labs/TabDPT.git@9699d9592b61c5f70fc88f5531cdb87b40cbedf5",
         # used hash: 9699d9592b61c5f70fc88f5531cdb87b40cbedf5
     ],
     "tabm": [
@@ -45,7 +45,6 @@ extras_require = {
 
 benchmark_requires = []
 for extra_package in [
-    "autogluon",
     "tabpfn",
     "tabicl",
     "ebm",

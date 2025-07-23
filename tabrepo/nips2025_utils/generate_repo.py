@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 import time
 
 import pandas as pd
 
 from tabrepo import EvaluationRepository
 from tabrepo.utils.pickle_utils import fetch_all_pickles
-from tabrepo.benchmark.result import ExperimentResults
+from tabrepo.benchmark.result import BaselineResult, ExperimentResults
 
 from .load_artifacts import load_all_artifacts
 
@@ -20,13 +21,25 @@ def generate_repo(experiment_path: str, task_metadata: pd.DataFrame, name_suffix
 
 
 def generate_repo_from_paths(
-    result_paths: list[str],
+    result_paths: list[str | Path],
     task_metadata: pd.DataFrame,
     engine: str = "ray",
     name_suffix: str | None = None,
     as_holdout: bool = False,
 ) -> EvaluationRepository:
     results_lst = load_all_artifacts(file_paths=result_paths, engine=engine, convert_to_holdout=as_holdout)
+    return generate_repo_from_results_lst(
+        results_lst=results_lst,
+        task_metadata=task_metadata,
+        name_suffix=name_suffix,
+    )
+
+
+def generate_repo_from_results_lst(
+    results_lst: list,
+    task_metadata: pd.DataFrame,
+    name_suffix: str | None = None,
+) -> EvaluationRepository:
     results_lst = [r for r in results_lst if r is not None]
     tids = set(list(task_metadata["tid"].unique()))
     results_lst = [r for r in results_lst if r.result["task_metadata"]["tid"] in tids]
@@ -51,14 +64,14 @@ def generate_repo_from_paths(
 
 def copy_results_lst_from_paths(
     path: str,
-    result_paths: list[str],
+    result_paths: list[str | Path],
     task_metadata: pd.DataFrame,
     engine: str = "ray",
     name_suffix: str | None = None,
     rename_dict: dict | None = None,
     as_holdout: bool = False,
 ) -> EvaluationRepository:
-    results_lst = load_all_artifacts(file_paths=result_paths, engine=engine, convert_to_holdout=as_holdout)
+    results_lst: list[BaselineResult] = load_all_artifacts(file_paths=result_paths, engine=engine, convert_to_holdout=as_holdout)
     results_lst = [r for r in results_lst if r is not None]
     tids = set(list(task_metadata["tid"].unique()))
     results_lst = [r for r in results_lst if r.result["task_metadata"]["tid"] in tids]
