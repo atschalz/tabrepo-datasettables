@@ -104,8 +104,6 @@ class OpenMLTaskWrapper:
         test_indices: np.ndarray = None,
         train_size: int | float = None,
         test_size: int | float = None,
-        use_ftd: bool = False,
-        input_format: str = "openml",  # 'openml' or 'csv'
         benchmark_name: str | None = None,  # Used for Grinsztajn benchmark
         random_state: int = 0,
     ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
@@ -145,57 +143,6 @@ class OpenMLTaskWrapper:
             X_train, y_train = self.subsample(X=X_train, y=y_train, size=train_size, random_state=random_state)
         if test_size is not None:
             X_test, y_test = self.subsample(X=X_test, y=y_test, size=test_size, random_state=random_state)
-
-        if input_format == "csv":
-            X_train = self.to_csv_format(X_train)
-            X_test = self.to_csv_format(X_test)
-
-        if use_ftd:
-            X_cp = X_train.copy()
-            from ft_detection import FeatureTypeDetector # TODO: Move ft_detection to be part of TabArena/AutoGluon
-            # ftd = FeatureTypeDetector(target_type=self.problem_type, lgb_model_type='full-capacity')
-            
-            default_params = {
-                'tests_to_run': ['dummy_mean','leave_one_out','combination', 'interpolation'],
-                'min_q_as_num': 6, 
-                'n_folds': 5,
-                'alpha': 0.05,
-                'significance_method': 'wilcoxon',
-                'max_degree': 5,
-                'interpolation_criterion': "match",
-                'combination_criterion': 'win',
-                'combination_test_min_bins': 2,
-                'combination_test_max_bins': 2048,
-                'binning_strategy': 'lgb', # ['lgb', 'KMeans', 'DT']
-                }
-
-            X_train = X_train.drop(["Delivery_person_ID", "Type_of_order"], axis=1, errors='ignore')
-            X_test = X_test.drop(["Delivery_person_ID", "Type_of_order"], axis=1, errors='ignore')
-
-            # mvp_params = default_params.copy()
-            # mvp_params.update({
-            #     'tests_to_run': ['dummy_mean','leave_one_out','combination', 'interpolation', 'multivariate_performance'],
-            #     'mvp_criterion': 'average',
-            #     'mvp_use_data': 'all',  # 'all' or 'numeric'
-            #     'alpha': 0.1,
-            #     })
-            
-            # ftd = FeatureTypeDetector(target_type=self.problem_type, 
-            #                         **mvp_params,
-                                    
-            #                         )
-
-            # ftd.fit(X_cp, y_train)
-            # X_train = ftd.transform(X=X_train, mode='add')
-            # X_test = ftd.transform(X=X_test, mode='add')
-
-            # self.new_categorical = list(ftd.cat_dtype_maps.keys())
-            # self.new_numeric = [col for col in X_train.columns if ftd.dtypes[col]=="numeric" and ftd.orig_dtypes[col]!="numeric"]
-            # print(f"New categorical: {self.new_categorical}")
-            # print(f'New numeric: {self.new_numeric}')
-
-            # if any(X_cp.dtypes != X_train.dtypes):
-            #     self.ft_transformed = True
         
         return X_train, y_train, X_test, y_test
 

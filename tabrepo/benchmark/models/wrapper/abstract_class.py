@@ -5,7 +5,7 @@ import pandas as pd
 from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerDummy
 from autogluon.core.metrics import get_metric, Scorer
 from autogluon.features import AutoMLPipelineFeatureGenerator
-
+from autogluon.features.generators import PipelineFeatureGenerator
 from tabrepo.utils.time_utils import Timer
 
 
@@ -20,11 +20,13 @@ class AbstractExecModel:
         problem_type: str,
         eval_metric: Scorer,
         preprocess_data: bool = True,
+        preprocessor_name: str = 'default', # ['default', 'default_csv', 'ftd', 'ftd_csv']
         preprocess_label: bool = True,
     ):
         self.problem_type = problem_type
         self.eval_metric = eval_metric
         self.preprocess_data = preprocess_data
+        self.preprocessor_name = preprocessor_name
         self.preprocess_label = preprocess_label
         self.label_cleaner: LabelCleaner = None
         self._feature_generator = None
@@ -47,14 +49,57 @@ class AbstractExecModel:
             return self._feature_generator.transform(X)
         return X
 
+    def get_preprocessor(self) -> PipelineFeatureGenerator:
+        if self.preprocessor_name == 'default':
+            return AutoMLPipelineFeatureGenerator()
+        elif self.preprocessor_name == 'default_csv':
+            from tabrepo.preprocessors.default_csv import FromCSVAutoMLPipelineFeatureGenerator
+            return FromCSVAutoMLPipelineFeatureGenerator()
+        elif self.preprocessor_name == 'ftd':
+            from tabrepo.preprocessors.ftd import FTDAutoMLPipelineFeatureGenerator
+            return FTDAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'ftd_csv':
+            from tabrepo.preprocessors.ftd import FromCSVFTDAutoMLPipelineFeatureGenerator
+            return FromCSVFTDAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'catint':
+            from tabrepo.preprocessors.cat_interaction import CatIntAutoMLPipelineFeatureGenerator
+            return CatIntAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'catint_csv':
+            from tabrepo.preprocessors.cat_interaction import FromCSVCatIntAutoMLPipelineFeatureGenerator
+            return FromCSVCatIntAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'catres':
+            from tabrepo.preprocessors.cat_resolution import CatResAutoMLPipelineFeatureGenerator
+            return CatResAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'catfreq':
+            from tabrepo.preprocessors.cat_freq import CatFreqAutoMLPipelineFeatureGenerator
+            return CatFreqAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'te':
+            from tabrepo.preprocessors.target_enc import CatTEAutoMLPipelineFeatureGenerator
+            return CatTEAutoMLPipelineFeatureGenerator()
+        elif self.preprocessor_name == 'catgroupby':
+            from tabrepo.preprocessors.cat_groupby import CatGroupByAutoMLPipelineFeatureGenerator
+            return CatGroupByAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'catres_csv':
+            from tabrepo.preprocessors.cat_resolution import FromCSVCatResAutoMLPipelineFeatureGenerator
+            return FromCSVCatResAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'catirrelevant':
+            from tabrepo.preprocessors.cat_irrelevant import CatIrrelevantAutoMLPipelineFeatureGenerator
+            return CatIrrelevantAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'catirrelevant_csv':
+            from tabrepo.preprocessors.cat_irrelevant import FromCSVCatIrrelevantAutoMLPipelineFeatureGenerator
+            return FromCSVCatIrrelevantAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        else:
+            # TODO: Better use the default preprocessor as fallback solution?
+            raise NotImplementedError(f"Preprocessor {self.preprocessor_name} is not implemented.")
+
     def _preprocess_fit_transform(self, X: pd.DataFrame, y: pd.Series):
         if self.preprocess_label:
             self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y)
         else:
             self.label_cleaner = LabelCleanerDummy(problem_type=self.problem_type)
         if self.preprocess_data:
-            self._feature_generator = AutoMLPipelineFeatureGenerator()
-            X = self._feature_generator.fit_transform(X=X, y=y)
+            self._feature_generator = self.get_preprocessor()
+            X = self._feature_generator.fit_transform(X, y)
         y = self.transform_y(y)
         return X, y
 
