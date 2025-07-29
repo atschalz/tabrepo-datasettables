@@ -9,7 +9,7 @@ fi
 
 REPO_NAME=$1
 TAG=$2
-SOURCE_ACCOUNT=$3
+SOURCE_ACCOUNT=$3 
 TARGET_ACCOUNT=$4
 REGION=$5
 
@@ -20,7 +20,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BASE_DIR="$( cd "${SCRIPT_DIR}/../../.." && pwd )"
 
 # Check if all required directories exist, this is specific for TabRepo
-REQUIRED_DIRS=("tabrepo")
+REQUIRED_DIRS=("tabrepo" "tabprep")
 # TODO: Clarify whether autogluon really is necessary as we install it in the image anyway
 # REQUIRED_DIRS=("autogluon" "tabrepo")
 
