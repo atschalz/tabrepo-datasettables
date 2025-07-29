@@ -79,6 +79,15 @@ class AbstractExecModel:
         elif self.preprocessor_name == 'catgroupby':
             from tabrepo.preprocessors.cat_groupby import CatGroupByAutoMLPipelineFeatureGenerator
             return CatGroupByAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'numint':
+            from tabrepo.preprocessors.num_interaction import NumIntAutoMLPipelineFeatureGenerator
+            return NumIntAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'cattreat':
+            from tabrepo.preprocessors.cat_asnum_detection import CatTreatAutoMLPipelineFeatureGenerator
+            return CatTreatAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'linear':
+            from tabrepo.preprocessors.num_linear import NumLinearAutoMLPipelineFeatureGenerator
+            return NumLinearAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
         elif self.preprocessor_name == 'catres_csv':
             from tabrepo.preprocessors.cat_resolution import FromCSVCatResAutoMLPipelineFeatureGenerator
             return FromCSVCatResAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
