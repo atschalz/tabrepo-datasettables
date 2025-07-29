@@ -99,6 +99,7 @@ class EndToEndResults:
         *,
         subset: str | None = None,
         new_result_prefix: str | None = None,
+        max_folds = 30,
     ) -> pd.DataFrame:
         """Compare results on TabArena leaderboard.
 
@@ -132,7 +133,7 @@ class EndToEndResults:
         )
 
         df_results = pd.concat([paper_results, hpo_results], ignore_index=True)
-
+        
         if subset is not None:
             from tabrepo.nips2025_utils.fetch_metadata import load_task_metadata
 
@@ -163,6 +164,12 @@ class EndToEndResults:
                 raise ValueError(f"Invalid subset {subset} name!")
             df_results = df_results.reset_index(drop=True)
 
+        if max_folds < 30:
+            df_results = df_results[df_results["fold"] < max_folds]
+            df_results = df_results.reset_index(drop=True)
+        
+        df_results.to_csv(output_dir / "results.csv", index=False)
+        
         # Handle imputation of names
         imputed_names = list(df_results["method"][df_results["imputed"] > 0].unique())
         if len(imputed_names) == 0:
