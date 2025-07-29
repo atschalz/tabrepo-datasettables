@@ -28,20 +28,20 @@ class FromCSVAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
             text_ngram_params=text_ngram_params,
             **kwargs,
         )
-        self.preprocessing_adapted = False
+        # self.preprocessing_adapted = False
     
     def fit_transform(self, X: DataFrame, y=None, feature_metadata_in: FeatureMetadata = None, **kwargs) -> DataFrame:
         X_out = OpenMLTaskWrapper.to_csv_format(X)
-        if (X_out != X).any().any():
-            self.preprocessing_adapted = True
-        else:
-            raise ValueError("The preprocessing did not change the DataFrame.")
+        # if (X_out != X).any().any():
+        #     self.preprocessing_adapted = True
+        # else:
+        #     raise ValueError("The preprocessing did not change the DataFrame.")
         X_out = super().fit_transform(X_out, y, feature_metadata_in, **kwargs)
         return X_out
 
     def transform(self, X: DataFrame) -> DataFrame:
-        if self.preprocessing_adapted:
-            X = OpenMLTaskWrapper.to_csv_format(X)
+        # if self.preprocessing_adapted:
+        X = OpenMLTaskWrapper.to_csv_format(X)
         return super().transform(X)
 
      

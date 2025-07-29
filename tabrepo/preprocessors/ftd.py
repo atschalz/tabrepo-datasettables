@@ -2,11 +2,10 @@ from autogluon.features import AutoMLPipelineFeatureGenerator
 from tabrepo.benchmark.task.openml.task_wrapper import OpenMLTaskWrapper
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from pandas import DataFrame
-
 import sys
 sys.path.append('/home/ubuntu/cat_detection')
 from tabprep.ft_detection import FeatureTypeDetector
-
+from autogluon.features.generators import CategoryFeatureGenerator
 
 class FTDAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
     def __init__(self,
@@ -16,8 +15,6 @@ class FTDAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
         super().__init__(
             **kwargs,
         )
-
-    
         self.feature_type_detector = FeatureTypeDetector(
             target_type=target_type,
             tests_to_run = ['dummy_mean','leave_one_out','combination', 'interpolation', 'multivariate_performance'],
@@ -78,7 +75,8 @@ class FromCSVFTDAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
         X = self.feature_type_detector.transform(X)
         return super().transform(X)
 
-     
+    # def _get_category_feature_generator(self):
+    #     return CategoryFeatureGenerator()
 
 
 # class FromCSVAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
