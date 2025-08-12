@@ -56,7 +56,7 @@ class FromCSVFTDAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
             alpha = 0.1,
             significance_method = 'wilcoxon',
             max_degree = 5,
-            interpolation_criterion = "average",
+            interpolation_criterion = "match",
             combination_criterion = 'win',
             combination_test_min_bins = 2,
             combination_test_max_bins = 2048,

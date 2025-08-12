@@ -19,7 +19,8 @@ class NumIntAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
                 max_order=2, num_operations='all',
                 use_mvp=False,
                 corr_thresh=.95,
-                select_n_candidates=500,
+                select_n_candidates=2000,
+
             )
         
     # def _fit_transform_custom(self, X_out: DataFrame, type_group_map_special: dict, y=None):

@@ -39,9 +39,11 @@ class CatIrrelevantAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator
         )
 
         self.detector = IrrelevantCatDetector(
-            target_type=target_type,
-            method='LOO'
-            )
+                target_type=target_type, 
+                method='CV',  # 'CV' or 'LOO'
+                n_folds=5, cv_method='regular',
+                use_mvp=False,
+                )
         
     # def _fit_transform_custom(self, X_out: DataFrame, type_group_map_special: dict, y=None):
     #     self.interaction_detector.fit(X_out, y)

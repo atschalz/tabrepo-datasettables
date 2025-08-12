@@ -5,10 +5,10 @@ from pandas import DataFrame
 
 import sys
 sys.path.append('/home/ubuntu/cat_detection')
-from tabprep.cat_freq_detection import CatFreqDetector
+from tabprep.feature_selection import FeatureSelector
 from autogluon.features.generators import CategoryFeatureGenerator
 
-class CatFreqAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
+class FeatSelectAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
     def __init__(self,
         target_type: str,
         **kwargs,
@@ -17,10 +17,9 @@ class CatFreqAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
             **kwargs,
         )
 
-    
-        self.detector = CatFreqDetector(
+
+        self.detector = FeatureSelector(
             target_type=target_type,
-            use_mvp=False
             )
         
     # def _fit_transform_custom(self, X_out: DataFrame, type_group_map_special: dict, y=None):

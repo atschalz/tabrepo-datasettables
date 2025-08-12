@@ -2,13 +2,10 @@ from autogluon.features import AutoMLPipelineFeatureGenerator
 from tabrepo.benchmark.task.openml.task_wrapper import OpenMLTaskWrapper
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from pandas import DataFrame
-
-import sys
-sys.path.append('/home/ubuntu/cat_detection')
-from tabprep.cat_groupby import CategoricalGroupByDetector
+from tabprep.cat_engineering import CategoricalFeatureEngineer
 from autogluon.features.generators import CategoryFeatureGenerator
 
-class CatGroupByAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
+class CatEngineeringAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
     def __init__(self,
         target_type: str,
         **kwargs,
@@ -16,12 +13,11 @@ class CatGroupByAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
         super().__init__(
             **kwargs,
         )
-
-        self.detector = CategoricalGroupByDetector(
-            target_type=target_type,
-            execution_mode='all',
-            max_order=3,
-            use_mvp=False,
+        self.detector = CategoricalFeatureEngineer(        
+                target_type=target_type,
+                execution_mode='all',
+                max_order=3,
+                use_mvp=True, 
             )
         
     # def _fit_transform_custom(self, X_out: DataFrame, type_group_map_special: dict, y=None):
