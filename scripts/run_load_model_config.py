@@ -39,20 +39,21 @@ def get_config_generator(model_name):
     else:
         raise ValueError(f"Unknown model name: {model_name}")
 
-    return config_generator
+    return config_generator 
 
 
 if __name__ == '__main__':
-    use_models = ['LightGBM']
+    use_models = ['CatBoost']
     n_random_configs = 200
     n_random_configs_baselines = 50
     include_dummy = False
-    preprocessor_name = 'numint'
-    config_suffix = 'numint'
+    preprocessor_name = 'all_in_one'
+    config_suffix = 'cb_default'
+    time_limit = 7200
 
     # Dummy (constant predictor)
     if include_dummy:
-        experiments_dummy = ConfigGenerator(model_cls=DummyModel, search_space={}, manual_configs=[{}]).generate_all_bag_experiments(num_random_configs=0)
+        experiments_dummy = ConfigGenerator(model_cls=DummyModel, search_space={}, manual_configs=[{}]).generate_all_bag_experiments(num_random_configs=0, time_limit=time_limit)
         experiments_lst = [experiments_dummy]
     else:
         experiments_lst = []
@@ -60,11 +61,11 @@ if __name__ == '__main__':
     for model_name in use_models:
         config_generator = get_config_generator(model_name=model_name)
         if model_name in ['LinearModel', 'KNN']:  # TODO: Check whether these models are GPU only
-            experiments = config_generator.generate_all_bag_experiments(num_random_configs=n_random_configs_baselines, reuse_tabarena=True, preprocessor_name=preprocessor_name)
+            experiments = config_generator.generate_all_bag_experiments(num_random_configs=n_random_configs_baselines+1, reuse_tabarena=True, preprocessor_name=preprocessor_name)
         elif model_name in ['TabICL', 'TabDPT']:  # TODO: Check whether these models are GPU only
             experiments = config_generator.generate_all_bag_experiments(num_random_configs=0, reuse_tabarena=True, preprocessor_name=preprocessor_name)
         else:
-            experiments = config_generator.generate_all_bag_experiments(num_random_configs=n_random_configs, reuse_tabarena=True, preprocessor_name=preprocessor_name)
+            experiments = config_generator.generate_all_bag_experiments(num_random_configs=n_random_configs+1, reuse_tabarena=True, preprocessor_name=preprocessor_name)
         experiments_lst.append(experiments)
 
     experiments_all: list[AGModelBagExperiment] = [exp for exp_family_lst in experiments_lst for exp in exp_family_lst]

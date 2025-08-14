@@ -48,7 +48,7 @@ for extra_package in [
     "tabpfn",
     "tabicl",
     "ebm",
-    # "search_spaces",
+    "search_spaces",
     "realmlp",
     "tabdpt",
     "tabm",

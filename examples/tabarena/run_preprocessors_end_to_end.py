@@ -7,8 +7,10 @@ import os
 
 if __name__ == '__main__':
     method = "LightGBM"
-    path_raw = Path("results/ftd_full") #/ method
-    fig_output_dir = Path("figures/ftd_full") # / method
+    exp_name = 'all_in_one_0812'
+    new_result_prefix = 'TabPrep'
+    path_raw = Path(f"../results/{exp_name}") #/ method
+    fig_output_dir = Path(f"figures/{exp_name}") # / method
     if not os.path.exists(fig_output_dir):
         os.makedirs(fig_output_dir)
     # download = False
@@ -43,5 +45,6 @@ if __name__ == '__main__':
     3. Missing values are imputed to default RandomForest.
     """
     end_to_end_results = EndToEndResults.from_cache(method=method)
-    leaderboard = end_to_end_results.compare_on_tabarena(output_dir=fig_output_dir, new_result_prefix='CSV_', max_folds=9)
+    leaderboard = end_to_end_results.compare_on_tabarena(output_dir=fig_output_dir, new_result_prefix=new_result_prefix, max_folds=9)
     print(leaderboard)
+

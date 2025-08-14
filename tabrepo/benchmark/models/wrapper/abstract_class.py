@@ -7,7 +7,7 @@ from autogluon.core.metrics import get_metric, Scorer
 from autogluon.features import AutoMLPipelineFeatureGenerator
 from autogluon.features.generators import PipelineFeatureGenerator
 from tabrepo.utils.time_utils import Timer
-
+from autogluon.core.metrics import root_mean_squared_error
 
 class AbstractExecModel:
     can_get_oof = False
@@ -32,17 +32,46 @@ class AbstractExecModel:
         self._feature_generator = None
         self.failure_artifact = None
 
-    def transform_y(self, y: pd.Series) -> pd.Series:
-        return self.label_cleaner.transform(y)
+        self.postprocess = False
 
-    def inverse_transform_y(self, y: pd.Series) -> pd.Series:
-        return self.label_cleaner.inverse_transform(y)
+    def transform_y(self, X: pd.DataFrame, y: pd.Series) -> pd.Series:
+        y_out = y.copy()
+        y_out = self.label_cleaner.transform(y_out)
+        if hasattr(self._feature_generator, 'linear_residuals'):
+            if self._feature_generator.linear_residuals:
+                y_out = self._feature_generator.transform_pre_fit(X, y_out)
 
-    def transform_y_pred_proba(self, y_pred_proba: pd.DataFrame) -> pd.DataFrame:
-        return self.label_cleaner.transform_proba(y_pred_proba, as_pandas=True)
+        return y_out
 
-    def inverse_transform_y_pred_proba(self, y_pred_proba: pd.DataFrame) -> pd.DataFrame:
-        return self.label_cleaner.inverse_transform_proba(y_pred_proba, as_pandas=True)
+    def inverse_transform_y(self, X: pd.DataFrame, y: pd.Series, lin_residuals: pd.Series = None, X_str: pd.Series = None) -> pd.Series:
+        y_out = y.copy()
+        # y_out = self.label_cleaner.transform(y_out)
+        if hasattr(self._feature_generator, 'linear_residuals') or hasattr(self._feature_generator, 'postprocess_duplicates'):
+            if self._feature_generator.linear_residuals or self._feature_generator.postprocess_duplicates:
+                y_out = self._feature_generator.transform_post_predict(X, y_out, lin_residuals=lin_residuals, X_str=X_str)
+
+        return y_out
+        # return self.label_cleaner.inverse_transform(y)
+
+    # def transform_y_pred_proba(self, X: pd.DataFrame, y_pred_proba: pd.DataFrame) -> pd.DataFrame:
+    #     y_pred_proba_out = y_pred_proba.copy()
+    #     # y_pred_proba_out = self.label_cleaner.transform(y_pred_proba_out, as_pandas=True)
+    #     if hasattr(self._feature_generator, 'linear_residuals'):
+    #         if self._feature_generator.linear_residuals:
+    #             y_pred_proba_out = self._feature_generator.transform_post_predict(X, y_pred_proba_out)
+
+    #     return y_pred_proba_out
+
+        # return self.label_cleaner.transform_proba(y_pred_proba, as_pandas=True)
+
+    # def inverse_transform_y_pred_proba(self, X: pd.DataFrame, y_pred_proba: pd.DataFrame) -> pd.DataFrame:
+    #     y_out = y.copy()
+    #     y_out = self.label_cleaner.transform(y_out)
+    #     if hasattr(self._feature_generator, 'linear_residuals'):
+    #         if self._feature_generator.linear_residuals:
+    #             y_out = self._feature_generator.transform_pre_fit(X, y_out)
+    #     return y_out
+        # return self.label_cleaner.inverse_transform_proba(y_pred_proba, as_pandas=True)
 
     def transform_X(self, X: pd.DataFrame) -> pd.DataFrame:
         if self.preprocess_data:
@@ -79,6 +108,9 @@ class AbstractExecModel:
         elif self.preprocessor_name == 'catgroupby':
             from tabrepo.preprocessors.cat_groupby import CatGroupByAutoMLPipelineFeatureGenerator
             return CatGroupByAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'groupby':
+            from tabrepo.preprocessors.groupby_FE import GroupByAutoMLPipelineFeatureGenerator
+            return GroupByAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
         elif self.preprocessor_name == 'numint':
             from tabrepo.preprocessors.num_interaction import NumIntAutoMLPipelineFeatureGenerator
             return NumIntAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
@@ -88,6 +120,15 @@ class AbstractExecModel:
         elif self.preprocessor_name == 'linear':
             from tabrepo.preprocessors.num_linear import NumLinearAutoMLPipelineFeatureGenerator
             return NumLinearAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'featselect':
+            from tabrepo.preprocessors.feat_select import FeatSelectAutoMLPipelineFeatureGenerator
+            return FeatSelectAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'catengineer':
+            from tabrepo.preprocessors.cat_engineering import CatEngineeringAutoMLPipelineFeatureGenerator
+            return CatEngineeringAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
+        elif self.preprocessor_name == 'all_in_one':
+            from tabrepo.preprocessors.all_in_one import AllInOneAutoMLPipelineFeatureGenerator
+            return AllInOneAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
         elif self.preprocessor_name == 'catres_csv':
             from tabrepo.preprocessors.cat_resolution import FromCSVCatResAutoMLPipelineFeatureGenerator
             return FromCSVCatResAutoMLPipelineFeatureGenerator(target_type=self.problem_type)
@@ -102,18 +143,48 @@ class AbstractExecModel:
             raise NotImplementedError(f"Preprocessor {self.preprocessor_name} is not implemented.")
 
     def _preprocess_fit_transform(self, X: pd.DataFrame, y: pd.Series):
+        y_out = y.copy()
         if self.preprocess_label:
-            self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y)
+            self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y_out)
         else:
             self.label_cleaner = LabelCleanerDummy(problem_type=self.problem_type)
         if self.preprocess_data:
             self._feature_generator = self.get_preprocessor()
-            X = self._feature_generator.fit_transform(X, y)
-        y = self.transform_y(y)
-        return X, y
+            X_out = self._feature_generator.fit_transform(X, y_out)
+            if hasattr(self._feature_generator, 'linear_residuals'):
+                if self._feature_generator.linear_residuals:
+                    y_out = self._feature_generator.transform_pre_fit(X, y_out)
+                    self.orig_problem_type = self.problem_type
+                    self.problem_type = 'regression'
+                    self.eval_metric_orig = self.eval_metric
+                    self.eval_metric = root_mean_squared_error
+        
+        return X_out, y_out
+
+    # def pre_fit(self, X: pd.DataFrame, y: pd.Series):
+    #     y_out = y.copy()
+    #     if self.label_cleaner is None:
+    #         self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y_out)
+    #     y_out = self.label_cleaner.transform(y_out)
+    #     if hasattr(self._feature_generator, 'linear_residuals'):
+    #         if self._feature_generator.linear_residuals:
+    #             y_out = self._feature_generator.transform_pre_fit(X, y_out)
+
+    #     return y_out
 
     def post_fit(self, X: pd.DataFrame, y: pd.Series, X_test: pd.DataFrame):
         pass
+
+    def back_to_orig_target(self):
+        if hasattr(self._feature_generator, 'linear_residuals'):
+            if self._feature_generator.linear_residuals:
+                self.problem_type = self.orig_problem_type
+                self.eval_metric = self.eval_metric_orig
+        else:
+            pass
+        
+    # def post_predict(self, X_test: pd.DataFrame, y_pred: pd.Series, **kwargs) -> pd.Series:
+    #     return self._feature_generator.transform_post_predict(X_test, y_pred, **kwargs)
 
     # TODO: Prateek, Add a toggle here to see if user wants to fit or fit and predict, also add model saving functionality
     # TODO: Nick: Temporary name
@@ -126,6 +197,9 @@ class AbstractExecModel:
         dict
         Returns predictions, probabilities, fit time and inference time
         '''
+
+        # y = self.pre_fit(X, y)
+
         with (Timer() as timer_fit):
             self.fit(X, y)
 
@@ -139,6 +213,11 @@ class AbstractExecModel:
             with Timer() as timer_predict:
                 y_pred = self.predict(X_test)
             y_pred_proba = None
+        
+        if hasattr(self._feature_generator, 'linear_residuals'):
+            self.back_to_orig_target()
+            if self._feature_generator.linear_residuals and self.problem_type == 'binary':
+                y_pred_proba = y_pred
 
         out = {
             'predictions': y_pred,
@@ -146,6 +225,16 @@ class AbstractExecModel:
             'time_train_s': timer_fit.duration,
             'time_infer_s': timer_predict.duration,
         }
+
+        if hasattr(self._feature_generator, 'linear_residuals') and self._feature_generator.linear_residuals:
+            out['lin_res'] = self._feature_generator.detector.linear_residual_model.predict(X)
+            out['lin_res'] = pd.Series(out['lin_res'], index=X.index)
+
+            out['lin_res_test'] = self._feature_generator.detector.linear_residual_model.predict(X_test)
+            out['lin_res_test'] = pd.Series(out['lin_res_test'], index=X_test.index)
+
+            # if self.problem_type == 'binary':
+            #     self.predictor.problem_type = 'binary'
 
         return out
 
@@ -166,17 +255,43 @@ class AbstractExecModel:
             return np.argmax(y_pred_proba, axis=1)
 
     def predict(self, X: pd.DataFrame) -> pd.Series:
+        if hasattr(self._feature_generator, 'linear_residuals') and self._feature_generator.linear_residuals:
+            lin_res = self._feature_generator.detector.linear_residual_model.predict(X)
+        else: 
+            lin_res = None
+
+        if hasattr(self._feature_generator, 'postprocess_duplicates') and self._feature_generator.postprocess_duplicates:
+            X_str = X.astype(str).sum(axis=1)
+        else:
+            X_str = None
+
         X = self.transform_X(X=X)
         y_pred = self._predict(X)
-        return self.inverse_transform_y(y=y_pred)
+        # if hasattr(self._feature_generator, 'linear_residuals'):
+        #     if self._feature_generator.linear_residuals:
+        #         y_pred = self._feature_generator.transform_post_predict(X, y_pred)
+        return self.inverse_transform_y(X, y=y_pred, lin_residuals=lin_res, X_str=X_str)
 
     def _predict(self, X: pd.DataFrame):
         raise NotImplementedError
 
     def predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
+        if hasattr(self._feature_generator, 'linear_residuals') and self._feature_generator.linear_residuals:
+            lin_res = self._feature_generator.detector.linear_residual_model.predict(X)
+        else: 
+            lin_res = None
+
+        if hasattr(self._feature_generator, 'postprocess_duplicates') and self._feature_generator.postprocess_duplicates:
+            X_str = X.astype(str).sum(axis=1)
+        else:
+            X_str = None
+
         X = self.transform_X(X=X)
         y_pred_proba = self._predict_proba(X=X)
-        return self.inverse_transform_y_pred_proba(y_pred_proba=y_pred_proba)
+        # if hasattr(self._feature_generator, 'linear_residuals'):
+        #     if self._feature_generator.linear_residuals:
+        #         y_pred_proba = self._feature_generator.transform_post_predict(X, y_pred_proba)
+        return self.inverse_transform_y(X, y=y_pred_proba, lin_residuals=lin_res, X_str=X_str)
 
     def _predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
         raise NotImplementedError

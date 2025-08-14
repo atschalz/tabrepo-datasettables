@@ -20,7 +20,7 @@ class AllInOneAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
         self.detector = AllInOneEngineer(        
                 target_type=target_type,
                 # engineering_techniques=['drop_irrelevant', 'cat_freq', 'cat_int']
-                engineering_techniques=['num_as_cat', 'cat_freq', 'cat_int', 'cat_groupby', 'num_int', 'groupby', 'linear_residuals', 'duplicate_mapping'],
+                engineering_techniques=['cat_as_num', 'cat_freq', 'cat_int', 'cat_groupby', 'num_int', 'groupby', 'duplicate_mapping', 'linear_residuals'],
                 # engineering_techniques=['duplicate_mapping'],
             )
         self.linear_residuals = False
@@ -77,7 +77,7 @@ class AllInOneAutoMLPipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
                 # y_pred_adapted.iloc[:,1] = (y_pred_adapted.iloc[:,1] + self.detector.linear_residual_model.predict(X)).clip(0.0001,0.9999)
                 # y_pred_adapted.iloc[:,0] = 1 - y_pred_adapted.iloc[:,1]
 
-                y_pred_pos = y_pred + lin_residuals
+                y_pred_pos = (y_pred + lin_residuals).clip(0.0001, 0.9999)
                 y_pred_adapted = pd.concat([y_pred_pos, 1-y_pred_pos], axis=1)
                 # if y_pred_pos.mean()>0.5:
                 #     y_pred_adapted = pd.concat([1 - y_pred_pos, y_pred_pos], axis=1)

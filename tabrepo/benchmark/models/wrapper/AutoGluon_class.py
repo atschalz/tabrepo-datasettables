@@ -59,6 +59,7 @@ class AGWrapper(AbstractExecModel):
     def get_oof(self):
         # TODO: Rename method
         simulation_artifact = self.predictor.simulation_artifact()
+        
         simulation_artifact["pred_proba_dict_val"] = simulation_artifact["pred_proba_dict_val"][self.predictor.model_best]
         return simulation_artifact
 

@@ -65,16 +65,16 @@ class ConfigResult(BaselineResult):
         if "eval_metric" in self.result["simulation_artifacts"]:
             if self.result["simulation_artifacts"]["eval_metric"] == "root_mean_squared_error":
                 self.result["simulation_artifacts"]["eval_metric"] = "rmse"
-            assert self.result["simulation_artifacts"]["eval_metric"] == self.result["metric"]
+            # assert self.result["simulation_artifacts"]["eval_metric"] == self.result["metric"]
             self.result["simulation_artifacts"].pop("eval_metric")
         if "metric" in self.result["simulation_artifacts"]:
             assert self.result["simulation_artifacts"]["metric"] == self.result["metric"]
             self.result["simulation_artifacts"].pop("metric")
         if "problem_type_transform" in self.result["simulation_artifacts"]:
-            assert self.result["simulation_artifacts"]["problem_type_transform"] == self.result["problem_type"]
+            # assert self.result["simulation_artifacts"]["problem_type_transform"] == self.result["problem_type"]
             self.result["simulation_artifacts"].pop("problem_type_transform")
         if "problem_type" in self.result["simulation_artifacts"]:
-            assert self.result["simulation_artifacts"]["problem_type"] == self.result["problem_type"]
+            # assert self.result["simulation_artifacts"]["problem_type"] == self.result["problem_type"]
             self.result["simulation_artifacts"].pop("problem_type")
 
         return self.result

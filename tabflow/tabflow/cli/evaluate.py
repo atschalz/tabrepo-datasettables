@@ -62,7 +62,7 @@ def evaluate(
 ):
     # Load Context
     expname = experiment_name
-    ignore_cache = False  # set to True to overwrite existing caches and re-run experiments from scratch
+    ignore_cache = True  # set to True to overwrite existing caches and re-run experiments from scratch
 
     if task_metadata_path is not None:
         assert context_name is None

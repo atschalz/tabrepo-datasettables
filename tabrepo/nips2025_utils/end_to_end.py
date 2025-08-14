@@ -49,7 +49,7 @@ class EndToEnd:
         tabarena_context = TabArenaContext()
         self.hpo_results, self.model_results = tabarena_context.simulate_repo(
             method=self.method_metadata,
-            use_rf_config_fallback=False,
+            use_rf_config_fallback=True,
             cache=cache,
         )
 

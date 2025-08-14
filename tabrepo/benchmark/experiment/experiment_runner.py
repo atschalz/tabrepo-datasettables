@@ -281,6 +281,13 @@ class OOFExperimentRunner(ExperimentRunner):
                 simulation_artifact["pred_proba_dict_test"] = simulation_artifact["pred_proba_dict_test"].astype(np.float32)
                 simulation_artifact["pred_proba_dict_val"] = simulation_artifact["pred_proba_dict_val"].astype(np.float32)
 
+                if 'lin_res' in out:
+                    simulation_artifact["pred_proba_dict_val"] = (simulation_artifact["pred_proba_dict_val"] + out['lin_res']).clip(0,1)
+                    simulation_artifact["y_val"] = simulation_artifact["y_val"] + out['lin_res']
+
+                    # simulation_artifact["pred_proba_dict_test"] = simulation_artifact["pred_proba_dict_test"]
+
+
                 simulation_artifact["pred_proba_dict_test"] = simulation_artifact["pred_proba_dict_test"].values
                 simulation_artifact["pred_proba_dict_val"] = simulation_artifact["pred_proba_dict_val"].values
 
@@ -288,6 +295,21 @@ class OOFExperimentRunner(ExperimentRunner):
             simulation_artifact["metric"] = self.eval_metric_name
 
             out["metric_error_val"] = self.model.get_metric_error_val()
+
+            if 'lin_res' in out and simulation_artifact['metric'] == 'roc_auc':
+                from sklearn.metrics import roc_auc_score
+                simulation_artifact['problem_type'] = 'binary'
+                out["metric_error_val"] = 1-roc_auc_score(
+                    y_true=simulation_artifact["y_val"],
+                    y_score=simulation_artifact["pred_proba_dict_val"],
+                )
+
+                simulation_artifact['eval_metric'] = 'roc_auc'
+
+                if np.mean(simulation_artifact["y_test"]) > 0.5 and np.mean(simulation_artifact["pred_proba_dict_test"]) < 0.5: 
+                    simulation_artifact["pred_proba_dict_test"] = 1 - simulation_artifact["pred_proba_dict_test"]
+                elif np.mean(simulation_artifact["y_test"]) < 0.5 and np.mean(simulation_artifact["pred_proba_dict_test"]) > 0.5:
+                    simulation_artifact["pred_proba_dict_test"] = 1 - simulation_artifact["pred_proba_dict_test"]
 
             if self.compute_bag_info and (self.model.can_get_per_child_oof and self.model.can_get_per_child_val_idx):
                 X_test_transform = self.model.transform_X(X=self.X_test)
@@ -311,7 +333,8 @@ def evaluate(y_true: pd.Series, y_pred: pd.Series, y_pred_proba: pd.DataFrame, s
         error = scorer.error(y_true=y_true, y_pred=y_pred)
     elif problem_type == "binary":
         y_pred_proba = label_cleaner.transform_proba(y_pred_proba, as_pandas=True)
-        error = scorer.error(y_true=y_true, y_pred=pd.DataFrame(y_pred_proba).iloc[:, 1])
+        y_pred_proba = pd.DataFrame(y_pred_proba, index=y_true.index)
+        error = scorer.error(y_true=y_true, y_pred=y_pred_proba[y_pred_proba.corrwith(y_true).idxmax()])
     else:
         y_pred_proba = label_cleaner.transform_proba(y_pred_proba, as_pandas=True)
         error = scorer.error(y_true=y_true, y_pred=y_pred_proba)
