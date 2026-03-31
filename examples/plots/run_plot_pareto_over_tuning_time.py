@@ -37,6 +37,8 @@ def plot_hpo(
     optimal_arrow: bool = True,
     ylim: tuple[float | None, float | None] | None = None,
     display_names: dict[str] | None = None,
+    title: str | None = None,
+    title_fontsize: float = 20,
 ):
     """
     Plot HPO trajectories for multiple methods.
@@ -219,12 +221,15 @@ def plot_hpo(
     # Make major and minor tick lines gray, but labels stay black
     ax.tick_params(axis='both', which='both', color=grid_color, labelcolor='black')
 
+    if title is not None:
+        ax.set_title(title, fontsize=title_fontsize)
+
     ax.set_ylabel(ylabel, fontsize=17)
     ax.set_xlabel(xlabel, fontsize=17)
     ax.tick_params(axis='both', labelsize=9)
     fig.tight_layout()
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    fig.savefig(str(save_path))
+    fig.savefig(str(save_path), dpi=300)
 
 
 def compute_tuning_trajectories_leaderboard(
@@ -289,6 +294,7 @@ def compute_tuning_trajectories_leaderboard(
     leaderboard = arena.leaderboard(
         data=combined_data,
         include_elo=True,
+        include_error=True,
         elo_kwargs=dict(
             calibration_framework=calibration_framework,
             calibration_elo=1000,
@@ -301,6 +307,7 @@ def compute_tuning_trajectories_leaderboard(
     leaderboard_val = arena_val.leaderboard(
         data=combined_data,
         include_elo=True,
+        include_error=True,
         elo_kwargs=dict(
             calibration_framework=calibration_framework,
             calibration_elo=1000,
@@ -345,6 +352,11 @@ def compute_tuning_trajectories_leaderboard(
 
     leaderboard['Train time per 1K samples (s) (median)'] = leaderboard["median_time_train_s_per_1K"]
     leaderboard['Inference time per 1K samples (s) (median)'] = leaderboard["median_time_infer_s_per_1K"]
+
+    leaderboard["Train time (s)"] = leaderboard["time_train_s"]
+    leaderboard["Infer time (s)"] = leaderboard["time_infer_s"]
+    leaderboard["Metric Error"] = leaderboard["metric_error"]
+
     return leaderboard
 
 
@@ -413,6 +425,81 @@ def plot_tuning_trajectories_all(
             plot_kwargs=plot_kwargs,
         )
 
+def plot_tuning_trajectories_per_dataset(
+        tabarena_context: TabArenaContext,
+        fig_save_dir: str | Path = Path("plots") / "n_configs_per_dataset",
+        ban_bad_methods: bool = True,
+        file_ext: str = ".pdf",
+        extra_results = None,
+        calibration_framework = "RF (default)",
+        folds: list[int] | None = None,
+        methods_to_display: list[str] | None = None,
+        plot_kwargs: dict | None = None,
+):
+    if isinstance(fig_save_dir, str):
+        fig_save_dir = Path(fig_save_dir)
+    fig_save_dir.mkdir(parents=True, exist_ok=True)
+
+    datasets = list(tabarena_context.task_metadata["dataset"].unique())
+    n_combinations = len(datasets)
+
+    ts = time.time()
+
+    use_imputation = False
+    problem_type = "all"
+    dataset_subset = None
+    lite = False
+    average_seeds = False
+
+    # plots for sub-benchmarks, with and without imputation
+    for i, dataset in enumerate(datasets):
+        print(
+            f"Running tuning trajectories generation {i + 1}/{n_combinations}... {(time.time() - ts):.1f}s elapsed..."
+        )
+
+        # will take a few minutes
+        custom_folder_name = get_website_folder_name(
+            use_imputation=use_imputation,
+            problem_type=problem_type,
+            dataset_subset=dataset_subset,
+            lite=lite,
+        )
+        custom_folder_name = custom_folder_name / dataset
+
+        subset_list = []
+        if problem_type != "all":
+            subset_list.append(problem_type)
+        if dataset_subset is not None:
+            subset_list.append(dataset_subset)
+        if lite:
+            subset_list.append("lite")
+        (fig_save_dir / custom_folder_name).mkdir(parents=True, exist_ok=True)
+
+        import copy
+        plot_kwargs_cur = copy.deepcopy(plot_kwargs)
+
+        plot_kwargs_cur["title"] = f"Dataset: {dataset}"
+
+        plot_tuning_trajectories(
+            subset_map={
+                "placeholder_name": subset_list
+            },
+            average_seeds=average_seeds,
+            exclude_imputed=not use_imputation,
+            # Meta
+            tabarena_context=tabarena_context,
+            fig_save_dir=fig_save_dir / custom_folder_name / "tuning_trajectories",
+            ban_bad_methods=ban_bad_methods,
+            file_ext=file_ext,
+            extra_results=extra_results,
+            datasets=[dataset],
+            calibration_framework=calibration_framework,
+            folds=folds,
+            methods_to_display=methods_to_display,
+            plot_kwargs=plot_kwargs_cur,
+        )
+
+
 def plot_tuning_trajectories(
     tabarena_context: TabArenaContext = None,
     subset_map: dict[str, list[str]] | None = None,
@@ -423,6 +510,7 @@ def plot_tuning_trajectories(
     include_portfolio: bool = False,  # TODO: True not yet supported
     file_ext: str = ".pdf",
     extra_results = None,
+    datasets: list[str] | None = None,
     calibration_framework = "RF (default)",
     folds: list[int] | None = None,
     methods_to_display: list[str] | None = None,
@@ -500,6 +588,9 @@ def plot_tuning_trajectories(
 
     combined_data = pd.concat([result_baselines, results_hpo], ignore_index=True)
 
+    if datasets is not None:
+        combined_data = combined_data[combined_data["dataset"].isin(datasets)]
+
     # ----- add times per 1K samples -----
     dataset_to_n_samples_train = tabarena_context.task_metadata.set_index("name")["n_samples_train_per_fold"].to_dict()
     dataset_to_n_samples_test = tabarena_context.task_metadata.set_index("name")["n_samples_test_per_fold"].to_dict()
@@ -551,6 +642,42 @@ def plot_tuning_trajectories_from_leaderboard(
 
     ylim_imp = (0, None)
 
+    plot_hpo(
+        df=leaderboard,
+        xlabel="Train time (s)",
+        ylabel="Improvability (%)",
+        save_path=fig_save_dir / f"pareto_n_configs_imp_tot_train{file_ext}",
+        max_Y=False,
+        ylim=ylim_imp,
+        **plot_kwargs,
+    )
+    plot_hpo(
+        df=leaderboard,
+        xlabel="Infer time (s)",
+        ylabel="Improvability (%)",
+        save_path=fig_save_dir / f"pareto_n_configs_imp_tot_infer{file_ext}",
+        max_Y=False,
+        ylim=ylim_imp,
+        **plot_kwargs,
+    )
+    plot_hpo(
+        df=leaderboard,
+        xlabel="Train time (s)",
+        ylabel="Metric Error",
+        save_path=fig_save_dir / f"pareto_n_configs_err_tot_train{file_ext}",
+        max_Y=False,
+        # ylim=ylim_imp,
+        **plot_kwargs,
+    )
+    plot_hpo(
+        df=leaderboard,
+        xlabel="Infer time (s)",
+        ylabel="Metric Error",
+        save_path=fig_save_dir / f"pareto_n_configs_err_tot_infer{file_ext}",
+        max_Y=False,
+        # ylim=ylim_imp,
+        **plot_kwargs,
+    )
     plot_hpo(
         df=leaderboard,
         xlabel="Train time per 1K samples (s) (median)",

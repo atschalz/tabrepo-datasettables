@@ -4,7 +4,7 @@ from tabarena.nips2025_utils.artifacts._tabarena_method_metadata_2026_01_23_tabp
 from pathlib import Path
 from tabarena.nips2025_utils.tabarena_context import TabArenaContext
 from tabarena.nips2025_utils.artifacts import tabarena_method_metadata_collection
-from examples.plots.run_plot_pareto_over_tuning_time import plot_tuning_trajectories_all
+from examples.plots.run_plot_pareto_over_tuning_time import plot_tuning_trajectories_all, plot_tuning_trajectories_per_dataset
 from tabarena.utils.cache_v2 import cached_parquet_df, CacheMode
 
 
@@ -27,8 +27,8 @@ if __name__ == '__main__':
 
     ta_context = TabArenaContext(
         extra_methods=[
-            tabprep_gbm_metadata,
-            tabprep_lr_metadata,
+            # tabprep_gbm_metadata,
+            # tabprep_lr_metadata,
             tabprep_realtabpfnv250_metadata,
             tabprep_tabm_metadata,
         ]
@@ -121,4 +121,20 @@ if __name__ == '__main__':
         folds=folds,
         methods_to_display=[m.method for m in method_metadatas_base],
         plot_kwargs=plot_kwargs,
+    )
+
+
+    plot_tuning_trajectories_per_dataset(
+        tabarena_context=ta_context,
+        ban_bad_methods=False,
+        extra_results=[
+            hpo_trajectory_realtabpfn,
+            hpo_trajectory_tabm,
+            hpo_trajectory_linear,
+            hpo_trajectory_lightgbm,
+        ],
+        folds=folds,
+        methods_to_display=[m.method for m in method_metadatas_base],
+        plot_kwargs=plot_kwargs,
+        file_ext=".png",
     )
