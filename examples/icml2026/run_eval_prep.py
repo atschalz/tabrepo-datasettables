@@ -13,6 +13,7 @@ from tabarena.utils.cache_v2 import cached_parquet_df, CacheMode
 
 from autogluon.common import TabularDataset
 
+folds=[0, 1, 2]
 
 # Only methods on live TabArena leaderboard as of Jan 26th, 2026 that have results for all tasks
 _methods_icml_paper = [
@@ -47,6 +48,8 @@ _methods_icml_paper = [
     "SAP-RPT-OSS",
 ]
 
+parquet_path = "/ceph/atschalz/auto_prep/tabarena/examples/icml2026/results/hpo_combined/"
+
 
 if __name__ == '__main__':
     fig_output_dir = Path("tabarena_figs") / "icml"
@@ -70,7 +73,7 @@ if __name__ == '__main__':
     )
 
     calibration_framework = "RF (default)"
-    result_baselines = ta_context.load_results_paper()
+    result_baselines = ta_context.load_results_paper(methods=_methods_icml_paper)
     result_baselines = TabArenaContext.fillna_metrics(
         df_to_fill=result_baselines,
         df_fillna=result_baselines[result_baselines["method"] == calibration_framework],
@@ -100,7 +103,7 @@ if __name__ == '__main__':
     # )
     # results_icml_defaults["method"] = "PrepLightGBM + RealTabPFN-2.5 Defaults"
     # TabularDataset.save(path="results/result_portfolio_icml_defaults.parquet", df=results_icml_defaults)
-    results_icml_defaults = TabularDataset.load(path="results/result_portfolio_icml_defaults.parquet")
+    # results_icml_defaults = TabularDataset.load(path="results/result_portfolio_icml_defaults.parquet")
 
     mode = CacheMode.USE_IF_EXISTS
 
@@ -116,63 +119,30 @@ if __name__ == '__main__':
         # ("Full", {}),
     ]:
 
-        results_hpo_prep_w_tabpfn = cached_parquet_df(
-            path=path_hpo_combined / f"{name_prefix}RealTabPFN-2.5.parquet",
-            mode=mode,
-            compute_fn=lambda: ta_context.combine_hpo(
-                methods=["RealTabPFN-v2.5", "PrepRealTabPFN-v2.5"],
-                method_default="RealTabPFN-v2.5",
-                new_config_type=f"{name_prefix}(Prep)RealTabPFN-2.5",
-                ta_name=f"{name_prefix}(Prep)RealTabPFN-2.5",
-                ta_suite=f"{name_prefix}(Prep)RealTabPFN-2.5",
-                **fit_kwargs,
-            ),
-        )
+        results_hpo_prep_w_tabpfn = pd.read_parquet(f"{parquet_path}/RealTabPFN-2.5.parquet")
 
-        results_hpo_prep_w_lightgbm = cached_parquet_df(
-            path=path_hpo_combined / f"{name_prefix}LightGBM.parquet",
-            mode=mode,
-            compute_fn=lambda: ta_context.combine_hpo(
-                methods=["LightGBM", "PrepLightGBM"],
-                method_default="PrepLightGBM",
-                new_config_type=f"{name_prefix}(Prep)LightGBM",
-                ta_name=f"{name_prefix}(Prep)LightGBM",
-                ta_suite=f"{name_prefix}(Prep)LightGBM",
-                **fit_kwargs,
-            ),
-        )
+        results_hpo_prep_w_lightgbm = pd.read_parquet(f"{parquet_path}/LightGBM.parquet")
 
-        results_hpo_prep_w_tabm = cached_parquet_df(
-            path=path_hpo_combined / f"{name_prefix}TabM.parquet",
-            mode=mode,
-            compute_fn=lambda: ta_context.combine_hpo(
-                methods=["TabM_GPU", "PrepTabM"],
-                method_default="PrepTabM",
-                new_config_type=f"{name_prefix}(Prep)TabM",
-                ta_name=f"{name_prefix}(Prep)TabM",
-                ta_suite=f"{name_prefix}(Prep)TabM",
-                **fit_kwargs,
-            ),
-        )
+        results_hpo_prep_w_tabm = pd.read_parquet(f"{parquet_path}/TabM.parquet")
 
-        results_hpo_prep_w_lr = cached_parquet_df(
-            path=path_hpo_combined / f"{name_prefix}Linear.parquet",
-            mode=mode,
-            compute_fn=lambda: ta_context.combine_hpo(
-                methods=["LinearModel", "PrepLinearModel"],
-                method_default="PrepLinearModel",
-                new_config_type=f"{name_prefix}(Prep)Linear",
-                ta_name=f"{name_prefix}(Prep)Linear",
-                ta_suite=f"{name_prefix}(Prep)Linear",
-                **fit_kwargs,
-            ),
-        )
+        results_hpo_prep_w_lr = pd.read_parquet(f"{parquet_path}/Linear.parquet")
+
+        results_def_tabiclv2 = pd.read_parquet(f"{parquet_path}/TABICLV2.parquet")
+        results_def_tabiclv2["method"] = "TabICLv2 (default)"
+        results_def_tabiclv2["config_type"] = "TabICLv2"
+
+        results_def_tabpfn26 = pd.read_parquet(f"{parquet_path}/TABPFN26.parquet")
+        results_def_tabpfn26["method"] = "TabPFN-2.6 (default)"
+        results_def_tabpfn26["config_type"] = "TabPFN-2.6"
+
 
         extra_results += [
             results_hpo_prep_w_tabpfn,
             results_hpo_prep_w_lightgbm,
             results_hpo_prep_w_tabm,
             results_hpo_prep_w_lr,
+            results_def_tabiclv2,
+            results_def_tabpfn26,
         ]
 
     extra_results = pd.concat(extra_results, ignore_index=True)
@@ -198,8 +168,8 @@ if __name__ == '__main__':
     # )
     # results_icml_defaults_all["method"] = "All Prep Defaults"
     # TabularDataset.save(path="results/result_portfolio_icml_defaults_all.parquet", df=results_icml_defaults_all)
-    results_icml_defaults_all = TabularDataset.load(path="results/result_portfolio_icml_defaults_all.parquet")
-    results_icml_defaults_all["method"] = "(Prep)LightGBM + (Prep)RealTabPFN-2.5 Defaults"
+    # results_icml_defaults_all = TabularDataset.load(path="results/result_portfolio_icml_defaults_all.parquet")
+    # results_icml_defaults_all["method"] = "(Prep)LightGBM + (Prep)RealTabPFN-2.5 Defaults"
 
 
     # results_icml_defaults_no_prep = ta_context.simulate_portfolio_from_configs(
@@ -207,7 +177,7 @@ if __name__ == '__main__':
     # )
     # results_icml_defaults_no_prep["method"] = "LightGBM + RealTabPFN-2.5 Defaults"
     # TabularDataset.save(path="results/result_portfolio_icml_defaults_gbm_tabpfn.parquet", df=results_icml_defaults_no_prep)
-    results_icml_defaults_no_prep = TabularDataset.load(path="results/result_portfolio_icml_defaults_gbm_tabpfn.parquet")
+    # results_icml_defaults_no_prep = TabularDataset.load(path="results/result_portfolio_icml_defaults_gbm_tabpfn.parquet")
 
     extra_results = pd.concat([
         extra_results,
@@ -225,14 +195,14 @@ if __name__ == '__main__':
     method_style_map = {
         "(Prep)LightGBM": {
             "color": "#1f77b4", "fontweight": "bold",
-            "display_name": "PrepLightGBM",
+            "display_name": "PrepLGBM",
         },
         "PrepLightGBM": {"color": "#1f77b4", "fontstyle": "italic"},
         "LightGBM": {"color": "#1f77b4", "alpha": 0.85},
 
         "(Prep)RealTabPFN-2.5": {
             "color": "#ff7f0e", "fontweight": "bold",
-            "display_name": "PrepTabPFN-2.5",
+            "display_name": "PrepTabPFN2.5",
         },
         "PrepRealTabPFN-2.5": {"color": "#ff7f0e", "fontstyle": "italic"},
         "RealTabPFN-2.5": {
@@ -290,6 +260,7 @@ if __name__ == '__main__':
         "FastaiMLP",
         "ExtraTrees",
         "KNN",
+        "XGBoost",
         # "PrepLightGBM",
         # "PrepTabM",
         # "PrepRealTabPFN-2.5",
@@ -302,13 +273,16 @@ if __name__ == '__main__':
         average_seeds=False,
         subset=subsets,
         plot_with_baselines=True,
-        folds=[0, 1, 2],
+        folds=folds,
         imputed_names=[],  # FIXME: This is to hide imputed
         verbose=False,
         plot_tuning_kwargs={
             "method_style_map": method_style_map,
             "hidden_methods": hidden_methods,
             "baseline_text_y_gap": 1.5,
+            "xtick_label_fontsize": 9.5,
+            "axis_label_fontsize": 11,
+            "legend_fontsize": 10,
         },
         baselines=[
             "AutoGluon 1.4 (extreme, 4h)",
@@ -326,15 +300,14 @@ if __name__ == '__main__':
         output_dir=fig_output_dir_alt,
         **kwargs,
     )
-
-    # leaderboard_website = format_leaderboard(df_leaderboard=leaderboard)
-    leaderboard_website_v2 = ta_context.leaderboard_to_website_format(leaderboard=leaderboard)
-
     leaderboard_val: pd.DataFrame = ta_context.compare(
         output_dir=fig_output_dir_alt / "val",
         score_on_val=True,
         **kwargs,
     )
+
+    # leaderboard_website = format_leaderboard(df_leaderboard=leaderboard)
+    # leaderboard_website_v2 = ta_context.leaderboard_to_website_format(leaderboard=leaderboard)
 
     leaderboard_val["elo_val"] = leaderboard_val["elo"]
 
@@ -348,7 +321,7 @@ if __name__ == '__main__':
     # print(leaderboard_website.to_markdown(index=False))
 
     print("website v2")
-    print(leaderboard_website_v2.to_markdown(index=False))
+    # print(leaderboard_website_v2.to_markdown(index=False))
 
     size_subsets_lst = [
         [],

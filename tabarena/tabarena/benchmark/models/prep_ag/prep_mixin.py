@@ -14,6 +14,7 @@ from autogluon.features import TargetAwareFeatureCompressionFeatureGenerator, Ra
 from autogluon.features import NeighborInteractionFeatureGenerator, NeighborStructureFeatureGenerator
 from autogluon.features import BulkFeatureGenerator, IdentityFeatureGenerator
 from autogluon.features import GroupByFeatureGenerator, LinearFeatureGenerator, SpearmanFeatureSelector
+from autogluon.features.generators.random_noise import RandomNoiseFeatureGenerator
 from autogluon.features.generators.abstract import AbstractFeatureGenerator
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ _feature_generator_class_lst = [
     OOFFrequentNumericTargetEncodingFeatureGenerator,
     LinearFeatureGenerator,
     SpearmanFeatureSelector,
+    RandomNoiseFeatureGenerator,
 ]
 
 _feature_generator_class_map = {
@@ -93,7 +95,9 @@ class ModelAgnosticPrepMixin:
                                            'NeighborInteractionFeatureGenerator', 'NeighborStructureFeatureGenerator',
                                            'LinearFeatureGenerator',
                                            'SpearmanFeatureSelector',
-                                           'GroupByFeatureGenerator','OOFNumericTargetEncodingFeatureGenerator','OOFFrequentNumericTargetEncodingFeatureGenerator']:
+                                           'GroupByFeatureGenerator','OOFNumericTargetEncodingFeatureGenerator','OOFFrequentNumericTargetEncodingFeatureGenerator',
+                                           'RandomNoiseFeatureGenerator'
+                                           ]:
                 # print(f"Estimating dtypes after preprocessing not yet implemented for {preprocessor_cls_name}, skipping...")
                 continue
             else:

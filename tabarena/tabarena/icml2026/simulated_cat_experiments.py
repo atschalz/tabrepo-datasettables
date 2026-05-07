@@ -908,73 +908,74 @@ experiment_params = {
     #     },
 
     ##################{"n_estimators": 300, "random_state": random_state}
-       "combine_rf": {
-        "target_model": "rf",   # "linear" | "rf" | "nn"
-        "rf_params": {"n_estimators": 50, "max_depth": 2},
-        "n":  1000,
-        "cat_cardinalities": (50,50),
-        "combo_offset_cfg": {"cats": ["cat_1", "cat_2"], "sigma": 1.5, "name": "cat1_x_cat2"},
-        "component_weights": (.45, 0.05, 0.5, 0.0, 0.0),  # w_center huge
-        "noise_levels": (0.1, 0.1, 0.2, 0.0, 0.0),
-        "prep_types": ["None", "DROP-CAT", "DROP-NUM", "OOF-TE", "OOF-TE-APPEND", "CATINT", "CATINT_OOFTE"],
-        },
-    "three_feature_high_cardinality_uninformative_rf_50trees_depth5": { # 
-        "n": 1000,
-        "p": 5,
-        "cat_cardinalities": (200, 200,200),
-        "target_model": "rf",
-        "rf_params": {"n_estimators": 50, "max_depth": 2},
-        "component_weights": (.95, 0.05, 0.0, 0.0, 0.0),  # w_center huge
-        "noise_levels": (0.1, 0.5, 0.0, 0.0, 0.0),
-        "prep_types": ["None", "DROP-CAT", "DROP-NUM", "OOF-TE", "OOF-TE-Smooth20", "TE", "LOO"],
-    },    
-    "three_feature_high_cardinality_uninformative_rf_50trees": { # 
-        "n": 1000,
-        "p": 5,
-        "cat_cardinalities": (200, 200,200),
-        "target_model": "rf",
-        "rf_params": {"n_estimators": 50, "max_depth": 2},
-        "component_weights": (.95, 0.05, 0.0, 0.0, 0.0),  # w_center huge
-        "noise_levels": (0.1, 0.5, 0.0, 0.0, 0.0),
-        "prep_types": ["None", "DROP-CAT", "DROP-NUM", "OOF-TE", "OOF-TE-Smooth20", "TE", "LOO"],
-    },    
-    "three_feature_high_cardinality_rf_100trees": { # 
-        "n": 1000,
-        "p": 5,
-        "rf_params": {"n_estimators": 100},
-        "cat_cardinalities": (200, 200, 200),
-        "target_model": "rf",
-        "component_weights": (0.5, 0.5, 0.0, 0.0, 0.0),  # w_center huge
-        "noise_levels": (0.1, 0.1, 0.0, 0.0, 0.0),
-        "prep_types": ["None", "DROP-CAT", "DROP-NUM", "OOF-TE", "OOF-TE-APPEND", "TE", "LOO"],
-    },
-    "three_feature_high_cardinality_uninformative_nn": { # 
-        "n": 1000,
-        "p": 5,
-        "cat_cardinalities": (200, 200,200),
-        "target_model": "nn",
-        "component_weights": (.95, 0.05, 0.0, 0.0, 0.0),  # w_center huge
-        "noise_levels": (0.1, 0.5, 0.0, 0.0, 0.0),
-        "prep_types": ["None", "DROP-CAT", "DROP-NUM", "OOF-TE", "OOF-TE-Smooth20", "TE", "LOO"],
-    },    
-    "three_feature_high_cardinality_rf": { # 
-        "n": 1000,
-        "p": 5,
-        "cat_cardinalities": (200, 200, 200),
-        "target_model": "rf",
-        "component_weights": (0.5, 0.5, 0.0, 0.0, 0.0),  # w_center huge
-        "noise_levels": (0.1, 0.1, 0.0, 0.0, 0.0),
-        "prep_types": ["None", "DROP-CAT", "DROP-NUM", "OOF-TE", "OOF-TE-APPEND", "TE", "LOO"],
-    },
-    "single_feature_high_cardinality_rf": { # 
-        "n": 1000,
-        "p": 5,
-        "cat_cardinalities": (500, ),
-        "target_model": "rf",
-        "component_weights": (0.5, 0.5, 0.0, 0.0, 0.0),  # w_center huge
-        "noise_levels": (0.1, 0.8, 0.0, 0.0, 0.0),
-        "prep_types": ["None", "DROP-CAT", "DROP-NUM", "OOF-TE", "OOF-TE-APPEND", "TE", "LOO"],
-    },
+    # THIS WAS UNCOMMENTED AT SUBMISSION:
+    #    "combine_rf": {
+    #     "target_model": "rf",   # "linear" | "rf" | "nn"
+    #     "rf_params": {"n_estimators": 50, "max_depth": 2},
+    #     "n":  1000,
+    #     "cat_cardinalities": (50,50),
+    #     "combo_offset_cfg": {"cats": ["cat_1", "cat_2"], "sigma": 1.5, "name": "cat1_x_cat2"},
+    #     "component_weights": (.45, 0.05, 0.5, 0.0, 0.0),  # w_center huge
+    #     "noise_levels": (0.1, 0.1, 0.2, 0.0, 0.0),
+    #     "prep_types": ["None", "DROP-CAT", "DROP-NUM", "OOF-TE", "OOF-TE-APPEND", "CATINT", "CATINT_OOFTE"],
+    #     },
+    # "three_feature_high_cardinality_uninformative_rf_50trees_depth5": { # 
+    #     "n": 1000,
+    #     "p": 5,
+    #     "cat_cardinalities": (200, 200,200),
+    #     "target_model": "rf",
+    #     "rf_params": {"n_estimators": 50, "max_depth": 2},
+    #     "component_weights": (.95, 0.05, 0.0, 0.0, 0.0),  # w_center huge
+    #     "noise_levels": (0.1, 0.5, 0.0, 0.0, 0.0),
+    #     "prep_types": ["None", "DROP-CAT", "DROP-NUM", "OOF-TE", "OOF-TE-Smooth20", "TE", "LOO"],
+    # },    
+    # "three_feature_high_cardinality_uninformative_rf_50trees": { # 
+    #     "n": 1000,
+    #     "p": 5,
+    #     "cat_cardinalities": (200, 200,200),
+    #     "target_model": "rf",
+    #     "rf_params": {"n_estimators": 50, "max_depth": 2},
+    #     "component_weights": (.95, 0.05, 0.0, 0.0, 0.0),  # w_center huge
+    #     "noise_levels": (0.1, 0.5, 0.0, 0.0, 0.0),
+    #     "prep_types": ["None", "DROP-CAT", "DROP-NUM", "OOF-TE", "OOF-TE-Smooth20", "TE", "LOO"],
+    # },    
+    # "three_feature_high_cardinality_rf_100trees": { # 
+    #     "n": 1000,
+    #     "p": 5,
+    #     "rf_params": {"n_estimators": 100},
+    #     "cat_cardinalities": (200, 200, 200),
+    #     "target_model": "rf",
+    #     "component_weights": (0.5, 0.5, 0.0, 0.0, 0.0),  # w_center huge
+    #     "noise_levels": (0.1, 0.1, 0.0, 0.0, 0.0),
+    #     "prep_types": ["None", "DROP-CAT", "DROP-NUM", "OOF-TE", "OOF-TE-APPEND", "TE", "LOO"],
+    # },
+    # "three_feature_high_cardinality_uninformative_nn": { # 
+    #     "n": 1000,
+    #     "p": 5,
+    #     "cat_cardinalities": (200, 200,200),
+    #     "target_model": "nn",
+    #     "component_weights": (.95, 0.05, 0.0, 0.0, 0.0),  # w_center huge
+    #     "noise_levels": (0.1, 0.5, 0.0, 0.0, 0.0),
+    #     "prep_types": ["None", "DROP-CAT", "DROP-NUM", "OOF-TE", "OOF-TE-Smooth20", "TE", "LOO"],
+    # },    
+    # "three_feature_high_cardinality_rf": { # 
+    #     "n": 1000,
+    #     "p": 5,
+    #     "cat_cardinalities": (200, 200, 200),
+    #     "target_model": "rf",
+    #     "component_weights": (0.5, 0.5, 0.0, 0.0, 0.0),  # w_center huge
+    #     "noise_levels": (0.1, 0.1, 0.0, 0.0, 0.0),
+    #     "prep_types": ["None", "DROP-CAT", "DROP-NUM", "OOF-TE", "OOF-TE-APPEND", "TE", "LOO"],
+    # },
+    # "single_feature_high_cardinality_rf": { # 
+    #     "n": 1000,
+    #     "p": 5,
+    #     "cat_cardinalities": (500, ),
+    #     "target_model": "rf",
+    #     "component_weights": (0.5, 0.5, 0.0, 0.0, 0.0),  # w_center huge
+    #     "noise_levels": (0.1, 0.8, 0.0, 0.0, 0.0),
+    #     "prep_types": ["None", "DROP-CAT", "DROP-NUM", "OOF-TE", "OOF-TE-APPEND", "TE", "LOO"],
+    # },
     "groupby_test_with_slope": { # 
         "n": 1000,
         "p": 5,
@@ -992,12 +993,12 @@ experiment_params = {
         "slope_cfg": {"cat": "cat_1", "strength": 2.0},
         "prep_types": ["None", "DROP-CAT", "DROP-NUM", "MEAN-GROUPBY", "REL-GROUPBY-keepMean", "REL-GROUPBY-meansubtract", "REL-GROUPBY-noPCT", "REL-GROUPBY", "OOF-TE"],
     },
-    "groupby_test_with_slope_10ksamples": { # 
-        "n": 10000,
+    "groupby_test_noslope": { # 
+        "n": 1000,
         "p": 5,
-        "cat_cardinalities": (1000, ),
+        "cat_cardinalities": (100, ),
         "target_model": "rf",
-        "component_weights": (0.3, 0.1, 0.0, 0.3, 0.3),  # w_center huge
+        "component_weights": (0.4, 0.2, 0.0, 0.0, 0.4),  # w_center huge
         "noise_levels": (0.2, 0.2, 0.0, 0.0, 0.2),
         "centering_cfg": {
             "cat": "cat_1",
@@ -1009,13 +1010,65 @@ experiment_params = {
         "slope_cfg": {"cat": "cat_1", "strength": 2.0},
         "prep_types": ["None", "DROP-CAT", "DROP-NUM", "MEAN-GROUPBY", "REL-GROUPBY-keepMean", "REL-GROUPBY-meansubtract", "REL-GROUPBY-noPCT", "REL-GROUPBY", "OOF-TE"],
     },
+    "groupby_test_noslope_nn": { # 
+        "n": 1000,
+        "p": 5,
+        "cat_cardinalities": (100, ),
+        "target_model": "nn",
+        "component_weights": (0.4, 0.2, 0.0, 0.0, 0.4),  # w_center huge
+        "noise_levels": (0.2, 0.2, 0.0, 0.0, 0.2),
+        "centering_cfg": {
+            "cat": "cat_1",
+            "num_col": "x1",
+            "mu_sigma": 10.0,    # big between-group shifts in x1
+            "eps_sigma": 2.0,   # smaller within-group variation
+            "target_fn": "tanh",
+        },
+        "slope_cfg": {"cat": "cat_1", "strength": 2.0},
+        "prep_types": ["None", "DROP-CAT", "DROP-NUM", "MEAN-GROUPBY", "REL-GROUPBY-keepMean", "REL-GROUPBY-meansubtract", "REL-GROUPBY-noPCT", "REL-GROUPBY", "OOF-TE"],
+    },
+    "groupby_test_noslope_cubic": { # 
+        "n": 1000,
+        "p": 5,
+        "cat_cardinalities": (100, ),
+        "target_model": "rf",
+        "component_weights": (0.4, 0.2, 0.0, 0.0, 0.4),  # w_center huge
+        "noise_levels": (0.2, 0.2, 0.0, 0.0, 0.2),
+        "centering_cfg": {
+            "cat": "cat_1",
+            "num_col": "x1",
+            "mu_sigma": 10.0,    # big between-group shifts in x1
+            "eps_sigma": 2.0,   # smaller within-group variation
+            "target_fn": "cubic",
+        },
+        "slope_cfg": {"cat": "cat_1", "strength": 2.0},
+        "prep_types": ["None", "DROP-CAT", "DROP-NUM", "MEAN-GROUPBY", "REL-GROUPBY-keepMean", "REL-GROUPBY-meansubtract", "REL-GROUPBY-noPCT", "REL-GROUPBY", "OOF-TE"],
+    },
+
+    # "groupby_test_with_slope_10ksamples": { # 
+    #     "n": 10000,
+    #     "p": 5,
+    #     "cat_cardinalities": (1000, ),
+    #     "target_model": "rf",
+    #     "component_weights": (0.3, 0.1, 0.0, 0.3, 0.3),  # w_center huge
+    #     "noise_levels": (0.2, 0.2, 0.0, 0.0, 0.2),
+    #     "centering_cfg": {
+    #         "cat": "cat_1",
+    #         "num_col": "x1",
+    #         "mu_sigma": 10.0,    # big between-group shifts in x1
+    #         "eps_sigma": 2.0,   # smaller within-group variation
+    #         "target_fn": "tanh",
+    #     },
+    #     "slope_cfg": {"cat": "cat_1", "strength": 2.0},
+    #     "prep_types": ["None", "DROP-CAT", "DROP-NUM", "MEAN-GROUPBY", "REL-GROUPBY-keepMean", "REL-GROUPBY-meansubtract", "REL-GROUPBY-noPCT", "REL-GROUPBY", "OOF-TE"],
+    # },
 
     # noise levels include: [numeric_base_noise, per_cat_noise, combo_noise, slope_noise, centered_signal_noise]
     }
 
 
 if __name__ == "__main__":
-    save_path = "tabarena/tabarena/tabarena/icml2026/results"
+    save_path = "/ceph/atschalz/auto_prep/tabarena/tabarena/tabarena/icml2026/results"
     exp_name = "simulated_cat_experiments_bag"
 
     num_bag_folds = 8
@@ -1064,7 +1117,7 @@ if __name__ == "__main__":
         
         print(f" Base score: {metric(y_test, np.ones_like(y_test)*y.mean())}")
         if params.get("target_model", "neutral") != "neutral":
-            print(f"Score from numeric model {metric(y_test,data["target_model_fitted"].predict(X_test.select_dtypes(np.number)))}")
+            print(f"Score from numeric model {metric(y_test,data['target_model_fitted'].predict(X_test.select_dtypes(np.number)))}")
         print(f" Base score by target mean: {metric(y_test, np.ones_like(y_test)*y.mean())}")
 
         ag_prep = AutoMLPipelineFeatureGenerator()

@@ -36,6 +36,9 @@ def plot_hpo(
     method_order: list[str] | None = None,
     optimal_arrow: bool = True,
     ylim: tuple[float | None, float | None] | None = None,
+    display_names: dict[str] | None = None,
+    title: str | None = None,
+    title_fontsize: float = 20,
 ):
     """
     Plot HPO trajectories for multiple methods.
@@ -64,6 +67,12 @@ def plot_hpo(
         If provided, sorts each method’s points by this numeric column (ascending),
         and highlights the point with the highest value of this column using a different marker.
     """
+    df = df.copy(deep=True)
+    if display_names is not None:
+        df[method_col] = df[method_col].map(display_names).fillna(df[method_col])
+        if method_order is not None:
+            method_order = [display_names.get(m, m) for m in method_order]
+
     if sort_col is not None:
         assert sort_col in df.columns
     # Build a 60-color palette from tab20 / tab20b / tab20c
@@ -212,12 +221,15 @@ def plot_hpo(
     # Make major and minor tick lines gray, but labels stay black
     ax.tick_params(axis='both', which='both', color=grid_color, labelcolor='black')
 
+    if title is not None:
+        ax.set_title(title, fontsize=title_fontsize)
+
     ax.set_ylabel(ylabel, fontsize=17)
     ax.set_xlabel(xlabel, fontsize=17)
     ax.tick_params(axis='both', labelsize=9)
     fig.tight_layout()
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    fig.savefig(str(save_path))
+    fig.savefig(str(save_path), dpi=300)
 
 
 def compute_tuning_trajectories_leaderboard(
@@ -228,12 +240,14 @@ def compute_tuning_trajectories_leaderboard(
     elo_bootstrap_rounds: int = 1,
     average_seeds: bool = False,
     subset: str | list[str] | None = None,
+    name_col = "config_type",
+    folds: list[int] | None = None,
 ):
     combined_data = combined_data.copy()
-    if subset is not None:
+    if subset is not None or folds is not None:
         if isinstance(subset, str):
             subset = [subset]
-        combined_data = subset_tasks(df_results=combined_data, subset=subset)
+        combined_data = subset_tasks(df_results=combined_data, subset=subset, folds=folds)
 
     tabarena_init_kwargs = dict(
         task_col="dataset",
@@ -263,10 +277,11 @@ def compute_tuning_trajectories_leaderboard(
     #     fillna_method=calibration_framework,
     # )
     # FIXME: Using this since it does it correctly
-    combined_data = TabArenaContext.fillna_metrics(
-        df_to_fill=combined_data,
-        df_fillna=combined_data[combined_data["method"] == calibration_framework],
-    )
+    if calibration_framework is not None:
+        combined_data = TabArenaContext.fillna_metrics(
+            df_to_fill=combined_data,
+            df_fillna=combined_data[combined_data["method"] == calibration_framework],
+        )
 
     if exclude_imputed:
         imputed_methods_count = combined_data.groupby("method")["imputed"].sum()
@@ -279,6 +294,7 @@ def compute_tuning_trajectories_leaderboard(
     leaderboard = arena.leaderboard(
         data=combined_data,
         include_elo=True,
+        include_error=True,
         elo_kwargs=dict(
             calibration_framework=calibration_framework,
             calibration_elo=1000,
@@ -291,6 +307,7 @@ def compute_tuning_trajectories_leaderboard(
     leaderboard_val = arena_val.leaderboard(
         data=combined_data,
         include_elo=True,
+        include_error=True,
         elo_kwargs=dict(
             calibration_framework=calibration_framework,
             calibration_elo=1000,
@@ -311,11 +328,11 @@ def compute_tuning_trajectories_leaderboard(
 
     leaderboard = leaderboard[leaderboard["method"].isin(methods_map.index)]
     leaderboard["n_configs"] = leaderboard["method"].map(methods_map["n_configs"])
-    leaderboard["config_type"] = leaderboard["method"].map(methods_map["config_type"])
+    leaderboard[name_col] = leaderboard["method"].map(methods_map[name_col])
 
-    leaderboard["name"] = leaderboard["config_type"]
+    leaderboard["name"] = leaderboard[name_col]
 
-    leaderboard = leaderboard.sort_values(by=["config_type", "n_configs"])
+    leaderboard = leaderboard.sort_values(by=[name_col, "n_configs"])
 
     leaderboard["Elo"] = leaderboard["elo"]
     leaderboard["Elo (Test)"] = leaderboard["Elo"]
@@ -335,6 +352,11 @@ def compute_tuning_trajectories_leaderboard(
 
     leaderboard['Train time per 1K samples (s) (median)'] = leaderboard["median_time_train_s_per_1K"]
     leaderboard['Inference time per 1K samples (s) (median)'] = leaderboard["median_time_infer_s_per_1K"]
+
+    leaderboard["Train time (s)"] = leaderboard["time_train_s"]
+    leaderboard["Infer time (s)"] = leaderboard["time_infer_s"]
+    leaderboard["Metric Error"] = leaderboard["metric_error"]
+
     return leaderboard
 
 
@@ -343,6 +365,11 @@ def plot_tuning_trajectories_all(
     fig_save_dir: str | Path = Path("plots") / "n_configs",
     ban_bad_methods: bool = True,
     file_ext: str = ".pdf",
+    extra_results = None,
+    calibration_framework = "RF (default)",
+    folds: list[int] | None = None,
+    methods_to_display: list[str] | None = None,
+    plot_kwargs: dict | None = None,
 ):
     if isinstance(fig_save_dir, str):
         fig_save_dir = Path(fig_save_dir)
@@ -391,7 +418,87 @@ def plot_tuning_trajectories_all(
             fig_save_dir=fig_save_dir / custom_folder_name / "tuning_trajectories",
             ban_bad_methods=ban_bad_methods,
             file_ext=file_ext,
+            extra_results=extra_results,
+            calibration_framework=calibration_framework,
+            folds=folds,
+            methods_to_display=methods_to_display,
+            plot_kwargs=plot_kwargs,
         )
+
+def plot_tuning_trajectories_per_dataset(
+        tabarena_context: TabArenaContext,
+        fig_save_dir: str | Path = Path("plots") / "n_configs_per_dataset",
+        ban_bad_methods: bool = True,
+        file_ext: str = ".pdf",
+        extra_results = None,
+        calibration_framework = "RF (default)",
+        folds: list[int] | None = None,
+        methods_to_display: list[str] | None = None,
+        plot_kwargs: dict | None = None,
+):
+    if isinstance(fig_save_dir, str):
+        fig_save_dir = Path(fig_save_dir)
+    fig_save_dir.mkdir(parents=True, exist_ok=True)
+
+    datasets = list(tabarena_context.task_metadata["dataset"].unique())
+    n_combinations = len(datasets)
+
+    ts = time.time()
+
+    use_imputation = False
+    problem_type = "all"
+    dataset_subset = None
+    lite = False
+    average_seeds = False
+
+    # plots for sub-benchmarks, with and without imputation
+    for i, dataset in enumerate(datasets):
+        print(
+            f"Running tuning trajectories generation {i + 1}/{n_combinations}... {(time.time() - ts):.1f}s elapsed..."
+        )
+
+        # will take a few minutes
+        custom_folder_name = get_website_folder_name(
+            use_imputation=use_imputation,
+            problem_type=problem_type,
+            dataset_subset=dataset_subset,
+            lite=lite,
+        )
+        custom_folder_name = custom_folder_name / dataset
+
+        subset_list = []
+        if problem_type != "all":
+            subset_list.append(problem_type)
+        if dataset_subset is not None:
+            subset_list.append(dataset_subset)
+        if lite:
+            subset_list.append("lite")
+        (fig_save_dir / custom_folder_name).mkdir(parents=True, exist_ok=True)
+
+        import copy
+        plot_kwargs_cur = copy.deepcopy(plot_kwargs)
+
+        plot_kwargs_cur["title"] = f"Dataset: {dataset}"
+
+        plot_tuning_trajectories(
+            subset_map={
+                "placeholder_name": subset_list
+            },
+            average_seeds=average_seeds,
+            exclude_imputed=not use_imputation,
+            # Meta
+            tabarena_context=tabarena_context,
+            fig_save_dir=fig_save_dir / custom_folder_name / "tuning_trajectories",
+            ban_bad_methods=ban_bad_methods,
+            file_ext=file_ext,
+            extra_results=extra_results,
+            datasets=[dataset],
+            calibration_framework=calibration_framework,
+            folds=folds,
+            methods_to_display=methods_to_display,
+            plot_kwargs=plot_kwargs_cur,
+        )
+
 
 def plot_tuning_trajectories(
     tabarena_context: TabArenaContext = None,
@@ -402,7 +509,14 @@ def plot_tuning_trajectories(
     ban_bad_methods: bool = True,
     include_portfolio: bool = False,  # TODO: True not yet supported
     file_ext: str = ".pdf",
+    extra_results = None,
+    datasets: list[str] | None = None,
+    calibration_framework = "RF (default)",
+    folds: list[int] | None = None,
+    methods_to_display: list[str] | None = None,
+    plot_kwargs: dict | None = None,
 ):
+    name_col = "config_type"
     if subset_map is None:
         subset_map = {
             "all": [],
@@ -416,7 +530,6 @@ def plot_tuning_trajectories(
 
     fig_save_dir = Path(fig_save_dir)
 
-    calibration_framework = "RF (default)"
     elo_bootstrap_rounds = 1
     method_rename_map = get_method_rename_map()  # TODO: avoid hard-coding
 
@@ -424,14 +537,21 @@ def plot_tuning_trajectories(
     method_metadata_lst = [m for m in method_metadata_lst if m.method_type == "config"]
     results_hpo_lst = []
     for m in method_metadata_lst:
+        if methods_to_display is not None:
+            if m.method not in methods_to_display:
+                continue
         results_hpo_trajectory = m.load_hpo_trajectories()
+        results_hpo_trajectory["display_name"] = m.display_name
         results_hpo_lst.append(results_hpo_trajectory)
+    if extra_results is not None:
+        results_hpo_lst += extra_results
     results_hpo = pd.concat(results_hpo_lst, ignore_index=True)
+    results_hpo["display_name"] = results_hpo["display_name"].fillna(results_hpo["config_type"])
 
     result_baselines = tabarena_context.load_results_paper()
     task_metadata = tabarena_context.task_metadata
 
-    results_hpo_mean = results_hpo.copy().groupby(["method", "dataset", "fold", "problem_type", "metric", "config_type"]).mean(
+    results_hpo_mean = results_hpo.copy().groupby(["method", "dataset", "fold", "problem_type", "metric", "config_type", "display_name"]).mean(
         numeric_only=True
     ).drop(columns=["seed"]).reset_index()
     results_hpo_mean["imputed"] = 0
@@ -445,7 +565,7 @@ def plot_tuning_trajectories(
         results_hpo_seeds = results_hpo.copy()
         results_hpo_seeds["method"] = results_hpo_seeds["method"] + "-" + results_hpo_seeds["seed"].astype(str)
         results_hpo_seeds["config_type"] = results_hpo_seeds["config_type"] + "-" + results_hpo_seeds["seed"].astype(str)
-        results_hpo_seeds = results_hpo_seeds.groupby(["method", "dataset", "fold", "problem_type", "metric", "config_type"]).mean(
+        results_hpo_seeds = results_hpo_seeds.groupby(["method", "dataset", "fold", "problem_type", "metric", "config_type", "display_name"]).mean(
             numeric_only=True).reset_index()
         results_lst.append(results_hpo_seeds)
 
@@ -462,7 +582,14 @@ def plot_tuning_trajectories(
         results_lst.append(results_portfolio)
 
     results_hpo = pd.concat(results_lst, ignore_index=True)
+
+    results_hpo["display_name"] = results_hpo["display_name"].fillna(results_hpo["config_type"])
+    results_hpo["config_type"] = results_hpo["display_name"]
+
     combined_data = pd.concat([result_baselines, results_hpo], ignore_index=True)
+
+    if datasets is not None:
+        combined_data = combined_data[combined_data["dataset"].isin(datasets)]
 
     # ----- add times per 1K samples -----
     dataset_to_n_samples_train = tabarena_context.task_metadata.set_index("name")["n_samples_train_per_fold"].to_dict()
@@ -484,6 +611,8 @@ def plot_tuning_trajectories(
             elo_bootstrap_rounds=elo_bootstrap_rounds,
             average_seeds=average_seeds,
             subset=subset,
+            name_col=name_col,
+            folds=folds,
         )
         leaderboard["name"] = leaderboard["name"].map(method_rename_map).fillna(leaderboard["name"])
 
@@ -496,6 +625,7 @@ def plot_tuning_trajectories(
             leaderboard=leaderboard,
             fig_save_dir=fig_save_dir_subset,
             file_ext=file_ext,
+            plot_kwargs=plot_kwargs,
         )
 
 
@@ -503,13 +633,51 @@ def plot_tuning_trajectories_from_leaderboard(
     leaderboard: pd.DataFrame,
     fig_save_dir: Path,
     file_ext: str = ".pdf",
+    plot_kwargs: dict | None = None,
 ):
-    plot_kwargs = {
-        "sort_col": "n_configs",
-    }
+    if plot_kwargs is None:
+        plot_kwargs = {}
+    plot_kwargs = plot_kwargs.copy()
+    plot_kwargs.setdefault("sort_col", "n_configs")
 
     ylim_imp = (0, None)
 
+    plot_hpo(
+        df=leaderboard,
+        xlabel="Train time (s)",
+        ylabel="Improvability (%)",
+        save_path=fig_save_dir / f"pareto_n_configs_imp_tot_train{file_ext}",
+        max_Y=False,
+        ylim=ylim_imp,
+        **plot_kwargs,
+    )
+    plot_hpo(
+        df=leaderboard,
+        xlabel="Infer time (s)",
+        ylabel="Improvability (%)",
+        save_path=fig_save_dir / f"pareto_n_configs_imp_tot_infer{file_ext}",
+        max_Y=False,
+        ylim=ylim_imp,
+        **plot_kwargs,
+    )
+    plot_hpo(
+        df=leaderboard,
+        xlabel="Train time (s)",
+        ylabel="Metric Error",
+        save_path=fig_save_dir / f"pareto_n_configs_err_tot_train{file_ext}",
+        max_Y=False,
+        # ylim=ylim_imp,
+        **plot_kwargs,
+    )
+    plot_hpo(
+        df=leaderboard,
+        xlabel="Infer time (s)",
+        ylabel="Metric Error",
+        save_path=fig_save_dir / f"pareto_n_configs_err_tot_infer{file_ext}",
+        max_Y=False,
+        # ylim=ylim_imp,
+        **plot_kwargs,
+    )
     plot_hpo(
         df=leaderboard,
         xlabel="Train time per 1K samples (s) (median)",

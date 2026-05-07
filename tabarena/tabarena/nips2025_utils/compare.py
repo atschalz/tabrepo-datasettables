@@ -12,6 +12,7 @@ from tabarena.paper.tabarena_evaluator import TabArenaEvaluator
 def compare_on_tabarena(
     output_dir: str | Path,
     new_results: pd.DataFrame | None = None,
+    ta_results: pd.DataFrame | None = None,
     *,
     only_valid_tasks: bool | str | list[str] = False,
     subset: str | list[str] | None = None,
@@ -49,9 +50,13 @@ def compare_on_tabarena(
                     )
                 method_rename_map[m.config_type] = display_name
 
-    paper_results = tabarena_context.load_results_paper(
-        download_results="auto",
-    )
+
+    if ta_results is None:
+        paper_results = tabarena_context.load_results_paper(
+            download_results="auto",
+        )
+    else:
+        paper_results = ta_results.copy(deep=True)
 
     if new_results is not None:
         new_results = new_results.copy(deep=True)

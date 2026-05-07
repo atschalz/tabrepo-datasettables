@@ -61,6 +61,8 @@ _methods_paper = [
     "TabFlex_GPU",
     "RealTabPFN-v2.5",
     "SAP-RPT-OSS",
+    "TABICLV2",
+    "TabPFN-v2.6",
 ]
 
 
@@ -112,6 +114,7 @@ class TabArenaContext:
         self,
         output_dir: str | Path,
         new_results: pd.DataFrame | None = None,
+        ta_results: pd.DataFrame | None = None,
         only_valid_tasks: bool | str | list[str] = False,
         subset: str | list[str] | None = None,
         folds: list[int] | None = None,
@@ -127,6 +130,7 @@ class TabArenaContext:
         return compare_on_tabarena(
             output_dir=output_dir,
             new_results=new_results,
+            ta_results=ta_results,
             only_valid_tasks=only_valid_tasks,
             subset=subset,
             folds=folds,

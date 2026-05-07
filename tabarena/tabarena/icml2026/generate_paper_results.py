@@ -5,7 +5,7 @@ import seaborn as sns
 
 from tabarena.icml2026.plotting.per_dataset_results import plot_model_performance_across_datasets
 from tabarena.icml2026.plotting.new_single_prep_boxplots import compare_methods_via_boxplots
-from tabarena.icml2026.plotting.two_figures_boxplots import boxplot_two_dataframes_pubready, boxplot_models_combined_vs_tabprep, boxplot_dataframe_pubready
+from tabarena.icml2026.plotting.two_figures_boxplots import _compute_scores_generic, boxplot_two_dataframes_pubready, boxplot_models_combined_vs_tabprep, boxplot_dataframe_pubready
 from tabarena.icml2026.plotting.single_preprocessor_boxplots import ablation_boxplot_colored_by_best
 
 from tabarena.nips2025_utils.tabarena_context import TabArenaContext
@@ -15,7 +15,95 @@ datasets_metadata = load_task_metadata()
 
 from tabarena.nips2025_utils.per_dataset_tables import get_per_dataset_tables
 
+import pandas as pd
+import numpy as np
 
+def extract_preprocessor_seeds(obj):
+    """
+    Extract {preprocessor_name: random_state} from obj['ag.prep_params'].
+    Works with the nested list structure shown in the example.
+    """
+    seeds = {}
+
+    def walk(x):
+        # Case 1: a preprocessor entry like ['Name', {...}]
+        if (
+            isinstance(x, list)
+            and len(x) == 2
+            and isinstance(x[0], str)
+            and isinstance(x[1], dict)
+        ):
+            name, params = x
+            seeds[name] = params.get("random_state", np.nan)
+            return
+
+        # Case 2: recurse through lists
+        if isinstance(x, list):
+            for item in x:
+                walk(item)
+
+    walk(obj.get("ag.prep_params", []))
+    return seeds
+
+def add_dataset_standardized_score(
+    df: pd.DataFrame,
+    dataset_col: str = "dataset",
+    error_col: str = "metric_error",
+    output_col: str = "metric_score_q25_to_best",
+    clip: bool = True,
+) -> pd.DataFrame:
+    """
+    Standardize `error_col` within each dataset so that:
+      - 1.0 = lowest error in that dataset
+      - 0.0 = 25th percentile of error in that dataset
+
+    Since lower error is better, scores above 1 can occur if a value is below
+    the estimated minimum boundary due to degenerate groups; scores below 0 can
+    occur for values worse than the 25th percentile. By default, scores are clipped
+    to [0, 1].
+
+    Formula within each dataset:
+        score = (q25 - error) / (q25 - min_error)
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe.
+    dataset_col : str
+        Column identifying datasets.
+    error_col : str
+        Column containing metric_error (lower is better).
+    output_col : str
+        Name of the new standardized score column.
+    clip : bool
+        Whether to clip the output to [0, 1].
+
+    Returns
+    -------
+    pd.DataFrame
+        Copy of the dataframe with a new score column.
+    """
+    out = df.copy()
+
+    # Per-dataset statistics
+    group_min = out.groupby(dataset_col)[error_col].transform("min")
+    group_q25 = out.groupby(dataset_col)[error_col].transform(lambda s: s.quantile(0.25))
+
+    denom = group_q25 - group_min
+
+    # Avoid division by zero for degenerate cases
+    score = np.where(
+        denom > 0,
+        (group_q25 - out[error_col]) / denom,
+        np.nan,
+    )
+
+    out[output_col] = score
+
+    if clip:
+        out[output_col] = out[output_col].clip(0.0, 1.0)
+
+    return out
 
 dat_map = {
     "HR_Analytics_Job_Change_of_Data_Scientists": "HR_Analytics",
@@ -39,12 +127,13 @@ dat_map = {
     }
 
 
-ablation_base_path = "/tabarena_figs/icml_ablation"
-base_path = "tabarena_figs/icml_final/"
-comb_path = "tabarena/examples/icml2026/results/hpo_combined/"
-save_path = "tabarena/tabarena/tabarena/icml2026/figures/new"
+ablation_base_path = "//ceph/atschalz/auto_prep/tabarena_figs/icml_ablation"
+base_path = "//ceph/atschalz/auto_prep/tabarena_figs/icml_final/"
+comb_path = "//ceph/atschalz/auto_prep/tabarena/examples/icml2026/results/hpo_combined/"
+save_path = "//ceph/atschalz/auto_prep/tabarena/tabarena/tabarena/icml2026/figures/new"
 
 use_fold = 0
+skip_per_data_tables = True
 
 if __name__ == '__main__':
     ### LOAD RESULTS
@@ -52,10 +141,13 @@ if __name__ == '__main__':
     # ta_context.load_configs_hyperparameters(methods = ["PrepLightGBM", "PrepLinearModel"], download=True)
     # ta_context.load_results_paper(methods=["PrepLightGBM", "PrepLinearModel"])
     ta_results = pd.concat([ta_context.load_hpo_results(i) for i in ta_context.methods if "AutoGluon" not in i]).reset_index(drop=True)
+    ta_results.dataset = ta_results.dataset.apply(lambda x: dat_map.get(x, x))
 
 
     results = ta_context.load_config_results("PrepLightGBM")
     hpo_results = ta_context.load_hpo_results("PrepLightGBM")
+    results.dataset = results.dataset.apply(lambda x: dat_map.get(x, x))
+    hpo_results.dataset = hpo_results.dataset.apply(lambda x: dat_map.get(x, x))
 
     # metadata = load_task_metadata()
     # task_map = dict(metadata[["name","tid"]].values)
@@ -68,10 +160,12 @@ if __name__ == '__main__':
     for model_name in models:
         model_results = pd.read_csv(f"{base_path}/{model_name}/model_results.csv")
         model_results["model_name"] = model_name
+        model_results.dataset = model_results.dataset.apply(lambda x: dat_map.get(x, x))
         all_model_results = pd.concat([all_model_results, model_results]).reset_index(drop=True)
 
         hpo_results = pd.read_csv(f"{base_path}/{model_name}/hpo_results.csv")
         hpo_results["model_name"] = model_name
+        hpo_results.dataset = hpo_results.dataset.apply(lambda x: dat_map.get(x, x))
         all_hpo_results = pd.concat([all_hpo_results, hpo_results]).reset_index(drop=True)
 
     all_model_results.ta_name = all_model_results.ta_name.map({"prep_TabM": "PrepTabM", 
@@ -80,8 +174,8 @@ if __name__ == '__main__':
                                                     "TabM_GPU": "TabM"}).fillna(all_model_results.ta_name)
 
     comb_results = pd.concat([
-    all_hpo_results[["dataset", "fold", "ta_name", "metric_error", "metric_error_val", "method_subtype"]], 
-    ta_results[["dataset", "fold", "ta_name", "metric_error", "metric_error_val", "method_subtype"]]
+    all_hpo_results[["dataset", "fold", "ta_name", "metric_error", "metric_error_val", "time_train_s", "time_infer_s", "method_subtype"]], 
+    ta_results[["dataset", "fold", "ta_name", "metric_error", "metric_error_val", "time_train_s", "time_infer_s", "method_subtype"]]
     ]).reset_index(drop=True)
 
     comb_results.ta_name = comb_results.ta_name.map({
@@ -89,7 +183,7 @@ if __name__ == '__main__':
         "RealTabPFN-v2.5": "RealTabPFN2.5", 
         "prep_RealTabPFN-v2.5": "PrepRealTabPFN2.5", 
         "TabM_GPU": "TabM"}).fillna(comb_results.ta_name)
-
+    
     comb_results_use = comb_results.loc[comb_results['method_subtype']=="tuned_ensemble"]
     comb_results_use = comb_results_use.loc[comb_results_use.fold==0]
 
@@ -100,12 +194,25 @@ if __name__ == '__main__':
     comb_results_use_bar = comb_results_use.copy()
     for m in ["LightGBM", "Linear", "RealTabPFN-2.5", "TabM"]:
         comb_results_use_bar = pd.concat([comb_results_use_bar, pd.read_parquet(f"{comb_path}/{m}.parquet")]).reset_index(drop=True)
+
+    # REBUTTAL
+    hpo_results_subset = comb_results.loc[comb_results.fold==0,["ta_name", "method_subtype", "dataset", "metric_error", "time_train_s", "time_infer_s"]]
     
+    seed_df = pd.DataFrame(ta_context.load_configs_hyperparameters(methods=["PrepLightGBM"])).T["hyperparameters"].apply(extract_preprocessor_seeds).apply(pd.Series)
+    seed_df = pd.merge(results, seed_df, left_on=["method"], right_index=True, how="left")
+    seed_df = add_dataset_standardized_score(seed_df)
+
+    comb_results_meta = pd.merge(comb_results,datasets_metadata[["dataset", "n_features"]],on="dataset")
+
+    #\REBUTTAL    
+
+
     ta_results = ta_results.loc[ta_results.method!='MITRA_GPU (default)']
-    get_per_dataset_tables(df_results=pd.concat([
-        ta_results,
-        comb_results_use_bar.loc[comb_results_use_bar.ta_name=="(Prep)LightGBM"]]).reset_index(drop=True)
-        , save_path=f"{save_path}")
+    if not skip_per_data_tables:
+        get_per_dataset_tables(df_results=pd.concat([
+            ta_results,
+            comb_results_use_bar.loc[comb_results_use_bar.ta_name=="(Prep)LightGBM"]]).reset_index(drop=True)
+            , save_path=f"{save_path}")
     
     
     comb_results_use_bar = comb_results_use_bar.loc[comb_results_use_bar.fold==0]
@@ -142,6 +249,11 @@ if __name__ == '__main__':
     ### PERFORMANCE ACROSS DATASETS PLOT
     base_marker = "."
     prep_marker = "*"
+
+
+    tabpfn26_res = pd.read_parquet("/ceph/atschalz/auto_prep/tabarena/examples/icml2026/results/hpo_combined/TABPFN26.parquet")
+    tabiclv2_res = pd.read_parquet("/ceph/atschalz/auto_prep/tabarena/examples/icml2026/results/hpo_combined/TABICLV2.parquet")
+
 
     fig, ax = plot_model_performance_across_datasets(
         comb_results_use_bar,
@@ -248,7 +360,8 @@ if __name__ == '__main__':
     ### LOAD ABLATION RESULTS
     ablation_model_results = pd.read_csv(f"{ablation_base_path}/model_results.csv")
     ablation_hpo_results = pd.read_csv(f"{ablation_base_path}/hpo_results.csv")
-
+    ablation_model_results.dataset = ablation_model_results.dataset.apply(lambda x: dat_map.get(x, x))
+    ablation_hpo_results.dataset = ablation_hpo_results.dataset.apply(lambda x: dat_map.get(x, x))
     ablation_model_results = ablation_model_results.loc[ablation_model_results.fold==use_fold]
 
     ### Prepare AutoFeat results for comparison
@@ -424,6 +537,15 @@ if __name__ == '__main__':
         "prep_LightGBM-ablation_c14_BAG_L1": "+OOF-TE",
         "prep_LightGBM-ablation_c15_BAG_L1": "+Combine-TE",
         "prep_LightGBM-ablation_c16_BAG_L1": "+GroupBy",
+        "prep_LightGBM-ablation_c17_BAG_L1": "-Arithmetic",
+        "prep_LightGBM-ablation_c18_BAG_L1": "-OOF-TE",
+        "prep_LightGBM-ablation_c19_BAG_L1": "-Combine-TE",
+        "prep_LightGBM-ablation_c20_BAG_L1": "-GroupBy",
+        "prep_LightGBM-ablation_c21_BAG_L1": "1000 features",
+        "prep_LightGBM-ablation_c22_BAG_L1": "500 features",
+        "prep_LightGBM-ablation_c23_BAG_L1": "100 features",
+
+
                 }
 
     prep_lgb_df = ta_results.loc[np.logical_and(
@@ -484,6 +606,57 @@ if __name__ == '__main__':
         figsize = (8, 4),
         save_path=f"{save_path}/ablation_contribution_boxplot_withtuned_v1.pdf",
         )
+    
+    boxplot_dataframe_pubready(
+        df_components.rename({"+RSFC": "TabPrep", "+GroupBy": "-RSFC"},axis=1).apply(lambda x: x.fillna(df_components.loc[x.index, "+Arithmetic"]), axis=0), 
+        baseline_col="Default LightGBM", 
+        competitor_cols=["TabPrep", "-Combine-TE", "-GroupBy", "-OOF-TE",  "-RSFC", "-Arithmetic"][::-1],
+        dpi=300,
+        transparent=True,
+        font_size=14.0,
+        title_size=14.0,
+        point_size=14.0,      
+        cap=[-0.1,.25],
+        figsize = (8, 4),
+        save_path=f"{save_path}/ablation_OOF_contribution_boxplot.pdf",
+        )
+    
+    boxplot_dataframe_pubready(
+        df_components.rename({"+RSFC": "2000 features"},axis=1).apply(lambda x: x.fillna(df_components.loc[x.index, "+Arithmetic"]), axis=0), 
+        baseline_col="Default LightGBM", 
+        competitor_cols=["OOF-TE", "100 features", "500 features", "1000 features", "2000 features", ][::-1],
+        dpi=300,
+        transparent=True,
+        font_size=14.0,
+        title_size=14.0,
+        point_size=14.0,      
+        cap=[-0.1,.25],
+        figsize = (8, 4),
+        save_path=f"{save_path}/relative_improvement_feature_size_boxplot.pdf",
+        )
+
+    # score_df, axis_label = _compute_scores_generic(
+    #     df=df_components,
+    #     baseline_col="Default LightGBM",
+    #     competitor_cols=["100 features", "500 features", "1000 features", "+RSFC"],
+    #     lower_is_better=True,
+    #     mode="relative",   # or "log_ratio" if you prefer
+    #     eps=1e-12,
+    #     cap=[-0.1,0.25],
+    #     dropna=True,
+    # )
+
+    # # Aggregate across rows for one bar per model
+    # mean_scores = score_df.mean(axis=0) * 100  # percent
+
+    # plt.figure(figsize=(8, 5))
+    # plt.bar(mean_scores.index, mean_scores.values)
+    # plt.axhline(0, linewidth=1)
+    # plt.ylabel(f"{axis_label} (%)")
+    # plt.title("Relative Improvement vs Default LightGBM")
+    # plt.xticks(rotation=20, ha="right")
+    # plt.tight_layout()
+    # plt.savefig(f"{save_path}/relative_improvement_feature_size_bar_plot.pdf", dpi=300)
 
     # boxplot_dataframe_pubready(
     #     df_components, 

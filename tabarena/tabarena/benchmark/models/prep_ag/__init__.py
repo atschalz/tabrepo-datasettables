@@ -9,6 +9,8 @@ from tabarena.benchmark.models.prep_ag.prep_xgb.prep_xgb_model import PrepXGBoos
 from tabarena.benchmark.models.prep_ag.prep_lr.prep_lr_model import PrepLinearModel
 from tabarena.benchmark.models.prep_ag.prep_realmlp.prep_realmlp_model import PrepRealMLPModel
 from tabarena.benchmark.models.prep_ag.openfe.openfe_model import OpenFELGBModel
+from tabarena.benchmark.models.prep_ag.prep_tabicl.prep_tabicl_model import PrepTabICLv2Model
+from tabarena.benchmark.models.prep_ag.prep_ebm.prep_ebm_model import PrepEBMModel
 
 __all__ = [
     "PrepLGBModel",
@@ -20,4 +22,6 @@ __all__ = [
     "PrepRealMLPModel",
     "AutoFeatLinearModel",
     "OpenFELGBModel",
+    "PrepTabICLv2Model",
+    "PrepEBMModel",
 ]

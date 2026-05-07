@@ -20,7 +20,7 @@ def parse_args() -> argparse.Namespace:
 
     # Parameters you requested
     p.add_argument("--ignore-cache", action="store_true", help="If set, overwrite caches and re-run experiments.")
-    p.add_argument("--model-name", type=str, default="LR", choices=["LR", "GBM", "CAT", "TABM", "REALTABPFN-V2.5", "REALMLP", "AutoFeatLinearModel", "BaseLR", "OpenFELGBModel", "GBM-ablation"])
+    p.add_argument("--model-name", type=str, default="LR", choices=["LR", "GBM", "CAT", "TABM", "REALTABPFN-V2.5", "REALMLP", "AutoFeatLinearModel", "BaseLR", "OpenFELGBModel", "GBM-ablation", "TABICL-V2", "PrepTABICL-V2"], help="Which model to run.")
     p.add_argument("--start-config", type=int, default=0)
     p.add_argument("--n-configs", type=int, default=50)
     p.add_argument("--start-dataset", type=int, default=0)
@@ -97,6 +97,12 @@ if __name__ == "__main__":
     elif model_name == "GBM-ablation":
         from tabarena.models.prep_lgb.generate_ablation import gen_lightgbm
         methods = gen_lightgbm.generate_all_bag_experiments(num_random_configs=200)
+    elif model_name == "TABICL-V2":
+        from tabarena.models.tabiclv2.generate import gen_tabicl
+        methods = gen_tabicl.generate_all_bag_experiments(num_random_configs=200)
+    elif model_name == "PrepTABICL-V2":
+        from tabarena.models.prep_tabiclv2.generate import gen_tabicl
+        methods = gen_tabicl.generate_all_bag_experiments(num_random_configs=200)
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
 

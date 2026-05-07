@@ -458,6 +458,46 @@ class TabArenaEvaluator:
             **plot_tuning_kwargs,
         )
 
+        # horizontal improvability barplot
+        # self.plot_tuning_impact(
+        #     df=df_results_rank_compare,
+        #     df_elo=leaderboard,
+        #     framework_types=framework_types,
+        #     save_prefix=f"{self.output_dir}",
+        #     use_gmean=use_gmean,
+        #     baselines=baselines,
+        #     baseline_colors=baseline_colors,
+        #     name_suffix="-improvability-horizontal",
+        #     imputed_names=imputed_names,
+        #     plot_tune_types=plot_tune_types,
+        #     use_y=True,
+        #     show=False,
+        #     **plot_tuning_kwargs,
+        #     metric="improvability",
+        #     use_score=False,
+        #     use_improvability=True,
+        # )
+
+        # # vertical improvability barplot
+        # self.plot_tuning_impact(
+        #     df=df_results_rank_compare,
+        #     df_elo=leaderboard,
+        #     framework_types=framework_types,
+        #     save_prefix=f"{self.output_dir}",
+        #     use_gmean=use_gmean,
+        #     baselines=baselines,
+        #     baseline_colors=baseline_colors,
+        #     name_suffix="-improvability",
+        #     imputed_names=imputed_names,
+        #     plot_tune_types=plot_tune_types,
+        #     show=False,
+        #     **plot_tuning_kwargs,
+        #     metric="improvability",
+        #     use_score=False,
+        #     use_improvability=True,
+        # )
+
+
         results_per_task = tabarena.compute_results_per_task(data=df_results_rank_compare)
         results_per_split = tabarena.compute_results_per_task(data=df_results_rank_compare, include_seed_col=True)
 
@@ -1051,6 +1091,7 @@ class TabArenaEvaluator:
         show: bool = True,
         use_gmean=False,
         use_score: bool = True,
+        use_improvability: bool = False,
         df_elo: pd.DataFrame = None,
         name_suffix: str | None = None,
         imputed_names: list[str] | None = None,
@@ -1060,12 +1101,19 @@ class TabArenaEvaluator:
         method_style_map: dict[str, MethodLabelStyle] | None = None,
         hidden_methods: list[str] | None = None,
         baseline_text_y_gap: float = 1.0,
+        xtick_label_fontsize: float | None = None,
+        axis_label_fontsize: float | None = None,
+        legend_fontsize: float | None = None,
     ):
         if method_style_map is None:
             method_style_map = {}
         same_width = use_y
         use_lim = True
         use_elo = df_elo is not None
+        if use_improvability:
+            # use_improvability = True
+            # use_elo = False
+            use_score = False
         lower_is_better = True
         lim = None
         xlim = None
@@ -1081,17 +1129,26 @@ class TabArenaEvaluator:
         groupby_columns_extra = ["dataset"]
 
         if use_elo:
-            metric = "elo"
-            use_lim = True
-            lim = [self.elo_ymin, None]
-            lower_is_better = False
-            df = df_elo.copy(deep=True)
-            df = df[[self.method_col, "elo", "elo+", "elo-"]]
-            groupby_columns_extra = []
+            if use_improvability:
+                lower_is_better = True
+                df = df_elo.copy(deep=True)
+                df = df[[self.method_col, 'improvability', 'improvability+', 'improvability-']]
+                # df["normalized-score"] = 1 - df[metric]
+                # metric = "normalized-score"
+                metric = "improvability"
+            else:
+                metric = "elo"
+                use_lim = True
+                lim = [self.elo_ymin, None]
+                lower_is_better = False
+                df = df_elo.copy(deep=True)
+                df = df[[self.method_col, "elo", "elo+", "elo-"]]
+                groupby_columns_extra = []
         elif use_score:
             lower_is_better = False
             df["normalized-score"] = 1 - df[metric]
             metric = "normalized-score"
+
         else:
             metric = metric
 
@@ -1302,6 +1359,12 @@ class TabArenaEvaluator:
                     boxplot.set(xlabel=None, ylabel='Elo' if metric=='elo' else 'Normalized score')  # remove method in the x-axis
                 # boxplot.set_title("Effect of tuning and ensembling")
 
+                if axis_label_fontsize is not None:
+                    if boxplot.xaxis.label.get_text():
+                        boxplot.xaxis.label.set_size(axis_label_fontsize)
+                    if boxplot.yaxis.label.get_text():
+                        boxplot.yaxis.label.set_size(axis_label_fontsize)
+
                 # do this before setting x/y limits
                 for baseline_idx, (baseline, color) in enumerate(zip(baselines, baseline_colors)):
                     baseline_mean = baseline_means[baseline]
@@ -1434,6 +1497,11 @@ class TabArenaEvaluator:
                         boxplot.set_xticks(labels)
                         boxplot.set_xticklabels(new_labels)
 
+                if xtick_label_fontsize is not None:
+                    boxplot.tick_params(axis="x", which="major", labelsize=xtick_label_fontsize)
+                    for label in boxplot.get_xticklabels():
+                        label.set_fontsize(xtick_label_fontsize)
+
                 # remove unnecessary extra space on the sides
                 if use_y:
                     plt.ylim(len(boxplot.get_yticklabels()) - 0.35, -0.65)
@@ -1493,6 +1561,7 @@ class TabArenaEvaluator:
                     handletextpad=0.4,
                     labelspacing=0.3,
                     columnspacing=0.8,
+                    fontsize=legend_fontsize,
                     # frameon=False,
                 )
 

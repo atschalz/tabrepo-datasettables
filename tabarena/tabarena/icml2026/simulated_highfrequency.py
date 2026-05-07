@@ -50,9 +50,9 @@ if __name__ == "__main__":
     prep_types = [None, "RSTAFC-noround-1order", "RSTAFC-noround"]
 
     for dataset_name in [
-        # 'ada_agnostic', # Experimental, unsure whether it helps
+        'ada_agnostic', # Experimental, unsure whether it helps
         # 'artificial-characters',
-        'electricity',
+        # 'electricity',
         ]:
 
         if os.path.exists(os.path.join(save_path, f'{exp_name}_{dataset_name}_results.pkl')) and not rerun:

@@ -381,6 +381,132 @@ gen_lightgbm = CustomAGConfigGenerator(
         'ag.max_dataset_size_for_residuals': 1000,
         'ag.residual_init_kwargs': {},
         },
+        { #17 No-Arithmetic
+        'ag.prep_params': [
+            [
+                # ['ArithmeticFeatureGenerator', {}],
+                ['GroupByFeatureGenerator', {}],
+                ['RandomSubsetTAFC', {"only_cat": True}],
+                [
+                    ['CategoricalInteractionFeatureGenerator', {"passthrough": True}],
+                    ['OOFTargetEncodingFeatureGenerator', {}],
+                ]],            
+        ['SpearmanFeatureSelector', {'max_features': 2000}]            
+        ],
+        'ag.prep_params.passthrough_types': {"invalid_raw_types": ["category", "object"]}, # We never keep categorical features
+        'ag.use_residuals': False,
+        'ag.residual_type': 'oof',
+        'ag.max_dataset_size_for_residuals': 1000,
+        'ag.residual_init_kwargs': {},
+        },
+        { #18 No-OOF-TE
+        'ag.prep_params': [
+            [
+                ['ArithmeticFeatureGenerator', {}],
+                ['GroupByFeatureGenerator', {}],
+                ['RandomSubsetTAFC', {"only_cat": True}],
+                [
+                    ['CategoricalInteractionFeatureGenerator', {"passthrough": True}],
+                    # ['OOFTargetEncodingFeatureGenerator', {}],
+                ]],            
+        ['SpearmanFeatureSelector', {'max_features': 2000}]            
+        ],
+        'ag.prep_params.passthrough_types': {"invalid_raw_types": ["category", "object"]}, # We never keep categorical features
+        'ag.use_residuals': False,
+        'ag.residual_type': 'oof',
+        'ag.max_dataset_size_for_residuals': 1000,
+        'ag.residual_init_kwargs': {},
+        },
+        { #19 No-CatInteractions
+        'ag.prep_params': [
+            [
+                ['ArithmeticFeatureGenerator', {}],
+                ['GroupByFeatureGenerator', {}],
+                ['RandomSubsetTAFC', {"only_cat": True}],
+                [
+                    # ['CategoricalInteractionFeatureGenerator', {"passthrough": True}],
+                    ['OOFTargetEncodingFeatureGenerator', {}],
+                ]],            
+        ['SpearmanFeatureSelector', {'max_features': 2000}]            
+        ],
+        'ag.prep_params.passthrough_types': {"invalid_raw_types": ["category", "object"]}, # We never keep categorical features
+        'ag.use_residuals': False,
+        'ag.residual_type': 'oof',
+        'ag.max_dataset_size_for_residuals': 1000,
+        'ag.residual_init_kwargs': {},
+        },
+        { #20 No-GroupBy
+        'ag.prep_params': [
+            [
+                ['ArithmeticFeatureGenerator', {}],
+                # ['GroupByFeatureGenerator', {}],
+                ['RandomSubsetTAFC', {"only_cat": True}],
+                [
+                    ['CategoricalInteractionFeatureGenerator', {"passthrough": True}],
+                    ['OOFTargetEncodingFeatureGenerator', {}],
+                ]],            
+        ['SpearmanFeatureSelector', {'max_features': 2000}]            
+        ],
+        'ag.prep_params.passthrough_types': {"invalid_raw_types": ["category", "object"]}, # We never keep categorical features
+        'ag.use_residuals': False,
+        'ag.residual_type': 'oof',
+        'ag.max_dataset_size_for_residuals': 1000,
+        'ag.residual_init_kwargs': {},
+        },
+        { #21 1000 features
+        'ag.prep_params': [
+            [
+                ['ArithmeticFeatureGenerator', {}],
+                # ['GroupByFeatureGenerator', {}],
+                ['RandomSubsetTAFC', {"only_cat": True}],
+                [
+                    ['CategoricalInteractionFeatureGenerator', {"passthrough": True}],
+                    ['OOFTargetEncodingFeatureGenerator', {}],
+                ]],            
+        ['SpearmanFeatureSelector', {'max_features': 1000}]            
+        ],
+        'ag.prep_params.passthrough_types': {"invalid_raw_types": ["category", "object"]}, # We never keep categorical features
+        'ag.use_residuals': False,
+        'ag.residual_type': 'oof',
+        'ag.max_dataset_size_for_residuals': 1000,
+        'ag.residual_init_kwargs': {},
+        },
+        { #22 500 features
+        'ag.prep_params': [
+            [
+                ['ArithmeticFeatureGenerator', {}],
+                # ['GroupByFeatureGenerator', {}],
+                ['RandomSubsetTAFC', {"only_cat": True}],
+                [
+                    ['CategoricalInteractionFeatureGenerator', {"passthrough": True}],
+                    ['OOFTargetEncodingFeatureGenerator', {}],
+                ]],            
+        ['SpearmanFeatureSelector', {'max_features': 500}]            
+        ],
+        'ag.prep_params.passthrough_types': {"invalid_raw_types": ["category", "object"]}, # We never keep categorical features
+        'ag.use_residuals': False,
+        'ag.residual_type': 'oof',
+        'ag.max_dataset_size_for_residuals': 1000,
+        'ag.residual_init_kwargs': {},
+        },
+        { #23 100 features
+        'ag.prep_params': [
+            [
+                ['ArithmeticFeatureGenerator', {}],
+                # ['GroupByFeatureGenerator', {}],
+                ['RandomSubsetTAFC', {"only_cat": True}],
+                [
+                    ['CategoricalInteractionFeatureGenerator', {"passthrough": True}],
+                    ['OOFTargetEncodingFeatureGenerator', {}],
+                ]],            
+        ['SpearmanFeatureSelector', {'max_features': 100}]            
+        ],
+        'ag.prep_params.passthrough_types': {"invalid_raw_types": ["category", "object"]}, # We never keep categorical features
+        'ag.use_residuals': False,
+        'ag.residual_type': 'oof',
+        'ag.max_dataset_size_for_residuals': 1000,
+        'ag.residual_init_kwargs': {},
+        },
     ],
 )
 

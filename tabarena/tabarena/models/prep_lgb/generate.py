@@ -106,6 +106,7 @@ def generate_configs_lightgbm(num_random_configs=200) -> list:
             pipeline.append(['TargetAwareFeatureCompressionFeatureGenerator', {"random_state": oofte_random_state}])
 
         if use_rstafc:
+            # pipeline.append(['RandomSubsetFeatureCompressionGenerator', {"n_subsets": rstafc_n_subsets, "random_state": rstafc_random_state}])
             pipeline.append(['RandomSubsetTAFC', {"n_subsets": rstafc_n_subsets, "random_state": rstafc_random_state}])
 
         if use_neighbor_interactions:
@@ -154,6 +155,7 @@ gen_lightgbm = CustomAGConfigGenerator(
             [
                 ['GroupByFeatureGenerator', {}],
                 ['RandomSubsetTAFC', {}],
+                # ['RandomSubsetFeatureCompressionGenerator', {}],
                 ['ArithmeticFeatureGenerator', {}],
                 [
                     ['CategoricalInteractionFeatureGenerator', {"passthrough": True}],

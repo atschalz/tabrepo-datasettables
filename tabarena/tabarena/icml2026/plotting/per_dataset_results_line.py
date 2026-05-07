@@ -1,0 +1,280 @@
+from typing import Literal, Optional, Sequence, Tuple, Dict
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+def plot_model_performance_across_datasets(
+    df: pd.DataFrame,
+    *,
+    dataset_col: str = "dataset",
+    metric_col: str = "metric_error",
+    model_col: str = "model_name",
+    mode: Literal["rank", "median_centered_signed"] = "median_centered_signed",
+    normalization_reference_models: Optional[Sequence[str]] = None,
+    normalization_center: Literal["median", "third_best"] = "median",
+    normalization_center_model: Optional[str] = None,
+    value_label: str = "Quantile-anchored normalized error (lower is better)",
+    display_models: Optional[Sequence[str]] = None,
+    sort_datasets_by_model: Optional[str] = None,
+    sort_datasets_by_best_of_models: Optional[Sequence[str]] = None,
+    sort_direction: Literal["best_to_worst", "worst_to_best"] = "best_to_worst",
+    clip_bad_side: bool = True,
+    bad_side_cap: float = 1.0,
+    clip_good_side: bool = False,
+    good_side_cap: float = -1.0,
+    dataset_order: Optional[Sequence[str]] = None,
+    model_order: Optional[Sequence[str]] = None,
+    figsize: Tuple[float, float] = (10, 4.8),
+    auto_width_per_dataset: Optional[float] = None,
+    font_size: float = 11.0,
+    title_font_size: Optional[float] = None,
+    label_font_size: Optional[float] = None,
+    tick_font_size: Optional[float] = None,
+    legend_font_size: Optional[float] = None,
+    legend_order: Optional[Sequence[str]] = None,
+    title: Optional[str] = None,
+    ylabel: Optional[str] = None,
+    xlabel: Optional[str] = None,
+    y_tick_labels: Optional[Dict[float, str]] = None,
+    jitter: float = 0.10,
+    marker_size: float = 90.0,
+    alpha: float = 0.9,
+    invert_rank_axis: bool = True,
+    grid: bool = True,
+    legend: bool = True,
+    legend_ncol: Optional[int] = None,
+    connect_models: bool = False,
+    line_alpha: float = 0.35,
+    show_model_averages: bool = False,
+    average_line_style: str = "--",
+    average_line_alpha: float = 0.6,
+    average_line_width: float = 1.5,
+    model_color_groups: Optional[Dict[str, Sequence[str]]] = None,
+    model_markers: Optional[Dict[str, str]] = None,
+    default_markers: Sequence[str] = ("o", "s", "^", "D", "v", "P", "X"),
+    exclude_marker_groups: Optional[Sequence[str]] = None,
+    prep_model_names: Optional[Sequence[str]] = None,
+    prep_label: str = "Prep best",
+    prep_color: Optional[str] = None,
+    prep_line_width: float = 2.8,
+    save_path: Optional[str] = None,
+    dpi: int = 300,
+) -> Tuple[plt.Figure, plt.Axes]:
+    """
+    Line-based variant of the per-dataset performance plot.
+
+    The normalization and dataset ordering mirror the original helper, but
+    Prep models can be collapsed into a single best-per-dataset line.
+    """
+
+    agg = (
+        df.groupby([dataset_col, model_col], as_index=False)[metric_col]
+        .mean()
+        .rename(columns={metric_col: "metric_mean"})
+    )
+
+    if mode == "rank":
+        agg["value"] = agg.groupby(dataset_col)["metric_mean"].rank(
+            ascending=True, method="average"
+        )
+    else:
+        ref = (
+            agg[agg[model_col].isin(normalization_reference_models)]
+            if normalization_reference_models is not None
+            else agg
+        )
+
+        best_df = ref.groupby(dataset_col)["metric_mean"].min().reset_index(name="best")
+        q_df = (
+            ref.groupby(dataset_col)["metric_mean"]
+            .quantile([0.25, 0.50])
+            .unstack()
+            .rename(columns={0.25: "q25", 0.50: "q50"})
+            .reset_index()
+        )
+        stats = best_df.merge(q_df, on=dataset_col, how="left")
+        agg = agg.merge(stats, on=dataset_col, how="left")
+
+        x = agg["metric_mean"]
+        b = agg["best"]
+        q25 = agg["q25"]
+        q50 = agg["q50"]
+
+        den_a = (q25 - b).replace(0, np.nan)
+        den_b = (q50 - q25).replace(0, np.nan)
+
+        value = np.where(
+            x <= q25,
+            (x - q25) / den_a,
+            (x - q25) / den_b,
+        )
+
+        agg["value_raw"] = value
+
+        plot_value = agg["value_raw"].copy()
+        if clip_bad_side:
+            plot_value = np.minimum(plot_value, bad_side_cap)
+        if clip_good_side:
+            plot_value = np.maximum(plot_value, good_side_cap)
+        agg["value_plot"] = plot_value
+
+    all_ds = agg[dataset_col].unique()
+    if dataset_order is None:
+        if sort_datasets_by_best_of_models is not None:
+            scores = (
+                agg[agg[model_col].isin(sort_datasets_by_best_of_models)]
+                .groupby(dataset_col)["value_raw"]
+                .min()
+                .reindex(all_ds)
+            )
+            dataset_order = scores.sort_values(
+                ascending=(sort_direction == "best_to_worst")
+            ).index.tolist()
+        elif sort_datasets_by_model is not None:
+            scores = (
+                agg[agg[model_col] == sort_datasets_by_model]
+                .set_index(dataset_col)["value_raw"]
+                .reindex(all_ds)
+            )
+            dataset_order = scores.sort_values(
+                ascending=(sort_direction == "best_to_worst")
+            ).index.tolist()
+        else:
+            dataset_order = sorted(all_ds)
+
+    prep_best_df = None
+    if prep_model_names is not None:
+        prep_rows = agg[agg[model_col].isin(prep_model_names)].copy()
+        if not prep_rows.empty:
+            prep_idx = prep_rows.groupby(dataset_col)["value_raw"].idxmin()
+            prep_best_df = prep_rows.loc[prep_idx, [dataset_col, "value_raw", "value_plot"]].copy()
+            prep_best_df[model_col] = prep_label
+            prep_best_df = prep_best_df[[dataset_col, model_col, "value_raw", "value_plot"]]
+
+    plot_df = agg if display_models is None else agg[agg[model_col].isin(display_models)]
+    if prep_best_df is not None:
+        plot_df = plot_df[~plot_df[model_col].isin(prep_model_names)]
+        plot_df = pd.concat([plot_df, prep_best_df], ignore_index=True)
+
+    if model_order is None:
+        model_order = (
+            plot_df.groupby(model_col)["value_raw"].mean().sort_values().index.tolist()
+        )
+
+    title_fs = title_font_size or font_size
+    label_fs = label_font_size or font_size
+    tick_fs = tick_font_size or font_size
+    legend_fs = legend_font_size or font_size
+
+    color_cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    model_to_color, model_to_linewidth = {}, {}
+
+    if model_color_groups:
+        for c, (_, models) in zip(color_cycle, model_color_groups.items()):
+            for m in models:
+                model_to_color[m] = c
+
+    remaining = [m for m in model_order if m not in model_to_color]
+    for i, m in enumerate(remaining):
+        model_to_color[m] = color_cycle[i % len(color_cycle)]
+
+    for m in model_order:
+        model_to_linewidth[m] = prep_line_width if m == prep_label else 2.4
+
+    if exclude_marker_groups and model_markers:
+        excluded_models = {
+            m
+            for group_name in exclude_marker_groups
+            for m, marker in model_markers.items()
+            if marker == group_name
+        }
+        plot_df = plot_df[~plot_df[model_col].isin(excluded_models)]
+        model_order = [m for m in model_order if m not in excluded_models]
+
+    ds_to_x = {d: i for i, d in enumerate(dataset_order)}
+    plot_df = plot_df.copy()
+    plot_df["x"] = plot_df[dataset_col].map(ds_to_x)
+
+    if auto_width_per_dataset is not None:
+        fig_width = max(figsize[0], plot_df[dataset_col].nunique() * auto_width_per_dataset)
+        fig, ax = plt.subplots(figsize=(fig_width, figsize[1]))
+    else:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    for m in model_order:
+        sub = plot_df[plot_df[model_col] == m].sort_values("x")
+        if sub.empty:
+            continue
+
+        ax.plot(
+            sub["x"],
+            sub["value_plot"],
+            color=prep_color if m == prep_label and prep_color is not None else model_to_color[m],
+            linewidth=model_to_linewidth[m],
+            alpha=alpha if m != prep_label else 0.95,
+            label=m,
+        )
+
+        if show_model_averages:
+            ax.hlines(
+                sub["value_plot"].mean(),
+                -0.5,
+                len(dataset_order) - 0.5,
+                linestyles=average_line_style,
+                linewidth=average_line_width,
+                alpha=average_line_alpha,
+                colors=model_to_color[m],
+            )
+
+    ax.axhline(-1.0, color="0.35", linestyle=":", linewidth=1.3, label="Previous TabArena best")
+
+    ax.set_xticks(range(len(dataset_order)))
+    ax.set_xticklabels(dataset_order, rotation=30, ha="right", fontsize=tick_fs)
+    ax.set_xlim(-0.6, len(dataset_order) - 0.4)
+    ax.set_ylabel(ylabel or value_label, fontsize=label_fs)
+    ax.set_xlabel(xlabel or "Dataset", fontsize=label_fs)
+    ax.tick_params(axis="y", labelsize=tick_fs)
+
+    if title:
+        ax.set_title(title, fontsize=title_fs)
+
+    if mode == "rank" and invert_rank_axis:
+        ax.invert_yaxis()
+
+    ax.grid(grid, axis="y", alpha=0.3)
+    ax.invert_yaxis()
+    ax.set_yticks([-2.0, -1.0, 0.0, 1.0])
+    ax.set_ylim(1.0, -2.0)
+    if y_tick_labels is not None:
+        ax.set_yticks(list(y_tick_labels.keys()))
+        ax.set_yticklabels(list(y_tick_labels.values()), fontsize=tick_fs)
+
+    if legend:
+        handles, labels = ax.get_legend_handles_labels()
+        if legend_order is not None:
+            label_to_handle = dict(zip(labels, handles))
+            ordered_handles = [label_to_handle[l] for l in legend_order if l in label_to_handle]
+            ordered_labels = [l for l in legend_order if l in label_to_handle]
+        else:
+            ordered_handles = handles
+            ordered_labels = labels
+
+        ncol = legend_ncol or min(len(ordered_labels), 10)
+        ax.legend(
+            ordered_handles,
+            ordered_labels,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 1.15),
+            ncol=ncol,
+            frameon=False,
+            fontsize=legend_font_size,
+        )
+
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
+
+    if save_path is not None:
+        fig.savefig(save_path, dpi=dpi, bbox_inches="tight")
+
+    return fig, ax

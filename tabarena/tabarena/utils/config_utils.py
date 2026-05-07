@@ -268,10 +268,12 @@ class PrepConfigGenerator(ConfigGenerator):
                 configs[i]['ag.prep_params'] = []
             pipeline = []
             prep_params_passthrough_types = None
+            use_random_noise = prep_configs[i].pop('use_random_noise', False)
             use_arithmetic_preprocessor = prep_configs[i].pop('use_arithmetic_preprocessor', False)
             use_cat_fe = prep_configs[i].pop('use_cat_fe', False)
             use_tafc = prep_configs[i].pop('use_tafc', False)
             use_rstafc = prep_configs[i].pop('use_rstafc', False)
+            use_oofte = prep_configs[i].pop('use_oofte', False)
             use_neighbor_interactions = prep_configs[i].pop('use_neighbor_interactions', False)
             use_neighbor_structure = prep_configs[i].pop('use_neighbor_structure', False)
             use_groupby = prep_configs[i].pop('use_groupby', False)
@@ -287,6 +289,9 @@ class PrepConfigGenerator(ConfigGenerator):
             groupby_max_feats = prep_configs[i].pop('groupby_max_feats', 500)
             spearman_max_feats = prep_configs[i].pop('spearman_max_feats', 2000)
             
+            if use_random_noise:
+                pipeline.append(['RandomNoiseFeatureGenerator', {"passthrough": False, "num_noise_features": 10}])
+
             if use_groupby:
                 pipeline.append(['GroupByFeatureGenerator', {"max_features": groupby_max_feats}])
                 
@@ -309,14 +314,17 @@ class PrepConfigGenerator(ConfigGenerator):
                 _generator_params = {"max_new_feats": arithmetic_max_feats, "random_state": arithmetic_random_state}
                 pipeline.append(['ArithmeticFeatureGenerator', _generator_params])
 
-            cat_pipeline = [['OOFTargetEncodingFeatureGenerator', {}]]
-            prep_params_passthrough_types = {"invalid_raw_types": ["category", "object"]}
+            cat_pipeline = []
+            if use_oofte:
+                cat_pipeline.append(['OOFTargetEncodingFeatureGenerator', {}])
+                prep_params_passthrough_types = {"invalid_raw_types": ["category", "object"]}
             if use_cat_fe:
                 cat_pipeline.append([
                     ['CategoricalInteractionFeatureGenerator', {"passthrough": True, "max_new_feats": cat_fe_max_feats, "random_state": cat_fe_random_state}],
                 ])
                 cat_pipeline.reverse()#
-            pipeline.append(cat_pipeline)
+            if len(cat_pipeline) > 0:
+                pipeline.append(cat_pipeline)
 
             if use_select_spearman:
                 configs[i]['ag.prep_params'].append(pipeline)

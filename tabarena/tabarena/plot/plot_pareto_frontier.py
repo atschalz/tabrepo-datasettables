@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
+import re
 
 import numpy as np
 import pandas as pd
@@ -8,11 +10,19 @@ from pandas.api.types import is_numeric_dtype
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import matplotlib.patheffects as PathEffects
-import seaborn as sns
 
 
 def aggregate_stats(df, on: str, groupby="method", method=["mean", "median", "std"]):
     return df[[groupby, on]].groupby(groupby).agg(method)[on]
+
+
+def _format_pareto_label(label: object) -> str:
+    text = str(label)
+    if text.startswith("PrepEnsemble (default"):
+        return "PrepEnsemble"
+    text = re.sub(r" \(default\)$", "-D", text)
+    text = re.sub(r" \(tuned\)$", "-T", text)
+    return text
 
 
 def get_pareto_frontier(
@@ -107,6 +117,8 @@ def plot_pareto(
     style_col: str | None = None,
     style_order: list[str] | None = None,
     style_markers: list[str] | dict | None = None,
+    hue_style_map: dict[str, str | Mapping[str, object]] | None = None,
+    hue_order: list[str] | None = None,
     label_col: str = "Method",
     max_X: bool = False,
     max_Y: bool = True,
@@ -116,6 +128,9 @@ def plot_pareto(
     add_optimal_arrow: bool = True,
     show: bool = True,
     legend_in_plot: bool = True,
+    annotate_frontier: bool = True,
+    close: bool = True,
+    return_fig_ax: bool = False,
 ):
     fig_size_ratio = 0.45
     fig_height = 10 * fig_size_ratio
@@ -130,26 +145,29 @@ def plot_pareto(
         # For each hue category (e.g., method_type), take the "best" y value:
         #   - max if higher is better (max_Y=True)
         #   - min if lower is better (max_Y=False)
-        agg_fun = "max" if max_Y else "min"
-        y_per_hue = (plot_df.groupby(hue)[y_name]
-                              .agg(agg_fun)
-                              .sort_values(ascending=False))
-        hue_order = list(y_per_hue.index)
+        if hue_order is None:
+            agg_fun = "max" if max_Y else "min"
+            y_per_hue = (plot_df.groupby(hue)[y_name]
+                                  .agg(agg_fun)
+                                  .sort_values(ascending=False))
+            hue_order = list(y_per_hue.index)
     else:
         plot_df = data.copy()
-        hue_order = None
+        if hue_order is None:
+            hue_order = None
 
     # Build stable color mapping per hue category (here: method_type)
     hue_levels = list(pd.unique(plot_df[hue]))
 
     # Ensure ≥20 visually distinct colors for many method types
-    base_palette = sns.color_palette(palette, 20)
+    cmap = plt.get_cmap(palette)
+    base_palette = [cmap(i / max(19, 1)) for i in range(20)]
     if len(hue_levels) > 20:
         # Extend deterministically by combining tab20 + tab20b + tab20c if needed
         extended_palette = (
-                sns.color_palette("tab20", 20)
-                + sns.color_palette("tab20b", 20)
-                + sns.color_palette("tab20c", 20)
+                [plt.get_cmap("tab20")(i / max(19, 1)) for i in range(20)]
+                + [plt.get_cmap("tab20b")(i / max(19, 1)) for i in range(20)]
+                + [plt.get_cmap("tab20c")(i / max(19, 1)) for i in range(20)]
         )
         colors = extended_palette[:len(hue_levels)]
     else:
@@ -157,8 +175,24 @@ def plot_pareto(
     colors = [colors[i % len(colors)] for i in range(len(hue_levels))]
     palette_map = dict(zip(hue_levels, colors))
 
-    label_to_hue_dict = data.set_index(label_col)[hue].to_dict()
-    label_to_color_dict = {l: palette_map[h] for l, h in label_to_hue_dict.items()}
+    if label_col not in data.columns and hue in data.columns:
+        label_col = hue
+
+    def _resolve_hue_color(level: str):
+        if hue_style_map and level in hue_style_map:
+            style_spec = hue_style_map[level]
+            if isinstance(style_spec, str):
+                return style_spec
+            if isinstance(style_spec, Mapping):
+                return style_spec.get("color") or style_spec.get("facecolor") or palette_map.get(level)
+            return style_spec
+        return palette_map.get(level)
+
+    if label_col == hue:
+        label_to_hue_dict = {v: v for v in pd.unique(data[hue])}
+    else:
+        label_to_hue_dict = data.set_index(label_col)[hue].to_dict()
+    label_to_color_dict = {l: _resolve_hue_color(h) for l, h in label_to_hue_dict.items()}
 
     # Style (marker) mapping per run_type (optional; seaborn can auto-assign markers if you omit this dict)
     if style_col is not None:
@@ -177,27 +211,89 @@ def plot_pareto(
     else:
         markers_arg = None
 
-    g = sns.relplot(
-        x=x_name,
-        y=y_name,
-        data=plot_df,
-        hue=hue,
-        hue_order=hue_order,
-        palette=palette_map,
-        style=style_col,
-        style_order=style_order,
-        markers=markers_arg,
-        height=fig_height,
-        aspect=aspect,
-        s=150,
-        alpha=0.8,
-        linewidth=0.1,
-        edgecolor="black",
-        legend=False,
-        zorder=2,
-    )
+    def _apply_hue_style(level: str, base_kwargs: dict[str, object]) -> dict[str, object]:
+        if not hue_style_map or level not in hue_style_map:
+            return base_kwargs
 
-    ax = g.ax
+        style_spec = hue_style_map[level]
+        if isinstance(style_spec, str):
+            base_kwargs["color"] = style_spec
+            return base_kwargs
+
+        if isinstance(style_spec, Mapping):
+            for key, value in style_spec.items():
+                if key == "marker":
+                    continue
+                if key in {"facecolor", "facecolors"}:
+                    base_kwargs["color"] = value
+                else:
+                    base_kwargs[key] = value
+            return base_kwargs
+
+        base_kwargs["color"] = style_spec
+        return base_kwargs
+
+    fig, ax = plt.subplots(figsize=(fig_height * aspect, fig_height))
+
+    # Draw points manually to avoid a seaborn dependency.
+    if style_col is None:
+        for level in (hue_order or hue_levels):
+            subset = plot_df[plot_df[hue] == level]
+            if subset.empty:
+                continue
+            scatter_kwargs = _apply_hue_style(
+                level,
+                dict(
+                    s=150,
+                    alpha=0.8,
+                    linewidths=0.6,
+                    edgecolors="black",
+                    color=palette_map[level],
+                ),
+            )
+            ax.scatter(
+                subset[x_name],
+                subset[y_name],
+                **scatter_kwargs,
+                marker="o",
+                label=str(level),
+                zorder=2,
+            )
+    else:
+        if isinstance(markers_arg, dict):
+            marker_map = markers_arg
+        elif markers_arg is True:
+            default_cycle = ['o', 'D', '^', 's', 'P', 'X', '*']
+            marker_map = {lvl: default_cycle[i % len(default_cycle)] for i, lvl in enumerate(style_order or [])}
+        else:
+            marker_map = {lvl: 'o' for lvl in (style_order or [])}
+
+        ordered_hues = hue_order or hue_levels
+        ordered_styles = style_order or list(pd.unique(plot_df[style_col]))
+        for hue_level in ordered_hues:
+            for style_level in ordered_styles:
+                subset = plot_df[(plot_df[hue] == hue_level) & (plot_df[style_col] == style_level)]
+                if subset.empty:
+                    continue
+                scatter_kwargs = _apply_hue_style(
+                    hue_level,
+                    dict(
+                        s=150,
+                        alpha=0.8,
+                        linewidths=0.6,
+                        edgecolors="black",
+                        color=palette_map[hue_level],
+                    ),
+                )
+                ax.scatter(
+                    subset[x_name],
+                    subset[y_name],
+                    **scatter_kwargs,
+                    marker=marker_map.get(style_level, "o"),
+                    label=f"{hue_level} / {style_level}",
+                    zorder=2,
+                )
+
     ax.set_xlabel(x_name, fontsize=17)
     ax.set_ylabel(y_name, fontsize=17)
     ax.tick_params(axis='both', labelsize=9)
@@ -213,7 +309,7 @@ def plot_pareto(
     pf_X = [pair[0] for pair in pareto_front]
     pf_Y = [pair[1] for pair in pareto_front]
 
-    g.set(xscale="log")
+    ax.set_xscale("log")
 
     if ylim is not None:
         ax.set_ylim(ylim)
@@ -263,27 +359,28 @@ def plot_pareto(
     # ------------------------------------------------------------------
     # Label every real vertex on the Pareto frontier
     # ------------------------------------------------------------------
-    offset_pts = 6
+    if annotate_frontier:
+        offset_pts = 6
 
-    for (x, y), label in zip(pareto_front, pareto_names):
-        if label is None:
-            continue
-        dx = offset_pts if max_X else -offset_pts
-        dy = offset_pts if max_Y else -offset_pts
-        ha = 'left' if max_X else 'right'
-        va = 'bottom' if max_Y else 'top'
-        txt = ax.annotate(
-            label,
-            xy=(x, y),
-            xytext=(dx, dy),
-            textcoords='offset points',
-            ha=ha,
-            va=va,
-            fontsize=9,
-            color=label_to_color_dict[label],
-            fontweight='bold',
-        )
-        txt.set_path_effects([PathEffects.withStroke(linewidth=3, foreground='white')])
+        for (x, y), label in zip(pareto_front, pareto_names):
+            if label is None:
+                continue
+            dx = offset_pts if max_X else -offset_pts
+            dy = offset_pts if max_Y else -offset_pts
+            ha = 'left' if max_X else 'right'
+            va = 'bottom' if max_Y else 'top'
+            txt = ax.annotate(
+                _format_pareto_label(label),
+                xy=(x, y),
+                xytext=(dx, dy),
+                textcoords='offset points',
+                ha=ha,
+                va=va,
+                fontsize=9,
+                color=label_to_color_dict[label],
+                fontweight='bold',
+            )
+            txt.set_path_effects([PathEffects.withStroke(linewidth=3, foreground='white')])
 
     # Restore original limits (prevents Matplotlib from auto-expanding them)
     ax.set_xlim(x_min, x_max)
@@ -302,7 +399,7 @@ def plot_pareto(
     color_handles = []
     color_labels = []
     for base_label in ordered_visible:
-        color = palette_map.get(base_label, (0.33, 0.33, 0.33))
+        color = _resolve_hue_color(base_label) or (0.33, 0.33, 0.33)
         handle = Line2D(
             [0], [0],
             marker="o",
@@ -327,6 +424,7 @@ def plot_pareto(
             marker_map = {}
         for lvl in (style_order or []):
             m = marker_map.get(lvl, 'o')
+            marker_size = 8 if m == "*" else 6
             h = Line2D(
                 [0], [0],
                 marker=m,
@@ -334,7 +432,7 @@ def plot_pareto(
                 markerfacecolor="white",
                 markeredgecolor="black",
                 markeredgewidth=0.8,
-                markersize=6,
+                markersize=marker_size,
             )
             marker_handles.append(h)
             marker_labels.append(str(lvl))
@@ -346,12 +444,12 @@ def plot_pareto(
     legend_fontsize = 9
     legend_in_plot_right = 0.98
 
-    legend1 = g.fig.legend(
+    legend1 = fig.legend(
         color_handles, color_labels,
-        loc="center left" if not legend_in_plot else ("lower right" if max_Y else "upper right"),#"lower right" if legend_in_plot else "center left",
-        bbox_to_anchor=(0.79, 0.62) if not legend_in_plot else ((legend_in_plot_right, 0.085) if max_Y else (legend_in_plot_right, 0.977)),#(0.99, 0.06) if legend_in_plot else (0.79, 0.62),
+        loc="upper right" if legend_in_plot else "center left",
+        bbox_to_anchor=(0.79, 0.62) if not legend_in_plot else (0.985, 0.985),
         frameon=True,
-        fontsize=legend_fontsize,
+        fontsize=legend_fontsize - 1 if legend_in_plot else legend_fontsize,
         ncol=1,
         labelspacing=0.25,
         handletextpad=0.5,
@@ -361,20 +459,20 @@ def plot_pareto(
     )
 
     # Retrieve the bbox of the first legend (in figure coordinates)
-    g.fig.canvas.draw()  # required so the legend layout is computed
+    fig.canvas.draw()  # required so the legend layout is computed
     bbox1 = legend1.get_window_extent()
-    bbox1_fig = bbox1.transformed(g.fig.transFigure.inverted())
+    bbox1_fig = bbox1.transformed(fig.transFigure.inverted())
 
     # Compute the left edge of legend1 in figure coords
     left_edge_legend1 = bbox1_fig.x0
     legend_in_plot_left = left_edge_legend1
 
-    g.fig.legend(
+    fig.legend(
         marker_handles, marker_labels,
-        loc="center left" if not legend_in_plot else ("lower right" if max_Y else "upper right"),#"lower right" if legend_in_plot else "center left",
-        bbox_to_anchor=(0.79, 0.26) if not legend_in_plot else ((legend_in_plot_left, 0.085) if max_Y else (legend_in_plot_left, 0.977)),#(0.85, 0.06) if legend_in_plot else (0.79, 0.26),
+        loc="upper right" if legend_in_plot else "center left",
+        bbox_to_anchor=(0.79, 0.26) if not legend_in_plot else (0.765, 0.985),
         frameon=True,
-        fontsize=legend_fontsize,
+        fontsize=legend_fontsize - 1 if legend_in_plot else legend_fontsize,
         ncol=1,
         labelspacing=0.25,
         handletextpad=0.5,
@@ -384,7 +482,9 @@ def plot_pareto(
     )
 
     if not legend_in_plot:
-        g.fig.subplots_adjust(right=0.78)
+        fig.subplots_adjust(right=0.78)
+    else:
+        fig.subplots_adjust(right=0.98, top=0.98, bottom=0.1, left=0.12)
 
     # Title + save/show
     # g.fig.suptitle(title, fontsize=14)
@@ -393,7 +493,11 @@ def plot_pareto(
         plt.savefig(save_path, bbox_inches="tight", dpi=600)
     if show:
         plt.show()
-    plt.close()
+    if close:
+        plt.close(fig)
+
+    if return_fig_ax:
+        return fig, ax
 
 
 def plot_optimal_arrow(
@@ -496,6 +600,9 @@ def plot_pareto_aggregated(
     show: bool = True,
     include_method_in_axis_name: bool = True,
     sort_y: bool = False,
+    annotate_frontier: bool = True,
+    close: bool = True,
+    return_fig_ax: bool = False,
 ):
     if data_x is None:
         data_x = data
@@ -520,7 +627,7 @@ def plot_pareto_aggregated(
     df_aggregated[x_name] = x_vals
     df_aggregated[hue] = df_aggregated.index
 
-    plot_pareto(
+    return plot_pareto(
         data=df_aggregated,
         x_name=x_name,
         y_name=y_name,
@@ -530,6 +637,10 @@ def plot_pareto_aggregated(
         max_Y=max_Y,
         ylim=ylim,
         hue=hue,
+        label_col=hue,
         sort_y=sort_y,
         show=show,
+        annotate_frontier=annotate_frontier,
+        close=close,
+        return_fig_ax=return_fig_ax,
     )
